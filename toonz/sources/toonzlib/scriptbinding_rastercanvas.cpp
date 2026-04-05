@@ -2,10 +2,12 @@
 
 #include "toonz/scriptbinding_rastercanvas.h"
 #include "toonz/scriptbinding_image.h"
+#include "toonz/scriptbinding_palette.h"
 #include "toonz/rasterstrokegenerator.h"
 #include "toonz/rasterbrush.h"
 #include "toonz/fill.h"
 #include "ttoonzimage.h"
+#include "tpalette.h"
 
 namespace TScriptBinding {
 
@@ -108,12 +110,31 @@ QScriptValue RasterCanvas::clear() {
   return context()->thisObject();
 }
 
+QScriptValue RasterCanvas::setPalette(const QScriptValue &paletteArg) {
+  Palette *pal = nullptr;
+  QScriptValue err = checkPalette(context(), paletteArg, pal);
+  if (err.isError()) return err;
+  m_palette = pal->getPalette();
+  return context()->thisObject();
+}
+
 QScriptValue RasterCanvas::toImage() {
   if (!m_raster) {
     return context()->throwError(tr("Canvas not initialized"));
   }
 
   TToonzImageP ti(m_raster, m_raster->getBounds());
+
+  // Attach palette — use user-provided or create a default one
+  if (m_palette) {
+    ti->setPalette(m_palette.getPointer());
+  } else {
+    // Create a default palette so ToonzRaster can be saved/converted.
+    // Style 0 = transparent, style 1 = black (matching TPalette defaults)
+    TPalette *defPal = new TPalette();
+    ti->setPalette(defPal);
+  }
+
   TImageP img(ti.getPointer());
   return create(new Image(img));
 }

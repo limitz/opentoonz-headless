@@ -29,6 +29,9 @@ public:
   Q_INVOKABLE QScriptValue removeStroke(int index);
   Q_INVOKABLE QScriptValue getStroke(int index);
 
+  // Region computation (must be called before fill on new images)
+  Q_INVOKABLE QScriptValue findRegions();
+
   // Fill operations
   Q_INVOKABLE QScriptValue fill(double x, double y, int styleId);
   Q_INVOKABLE QScriptValue setEdgeColors(int strokeIndex, int leftColorIdx,

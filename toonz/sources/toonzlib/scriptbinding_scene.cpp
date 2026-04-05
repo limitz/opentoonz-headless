@@ -105,6 +105,10 @@ QScriptValue Scene::getLevel(const QString &name) const {
 
 QScriptValue Scene::newLevel(const QString &levelTypeStr,
                              const QString &levelName) const {
+  if (levelName.isEmpty()) {
+    return context()->throwError(tr("Level name cannot be empty"));
+  }
+
   int levelType = NO_XSHLEVEL;
   if (levelTypeStr == "Vector")
     levelType = PLI_XSHLEVEL;
@@ -234,6 +238,10 @@ QScriptValue Scene::deleteColumn(int col) {
 }
 
 QScriptValue Scene::getStageObject(int colIdx) {
+  if (colIdx < 0) {
+    return context()->throwError(
+        tr("Column index must be >= 0, got %1").arg(colIdx));
+  }
   TXsheet *xsh = m_scene->getXsheet();
   TStageObjectId id = TStageObjectId::ColumnId(colIdx);
   TStageObject *obj = xsh->getStageObjectTree()->getStageObject(id, true);

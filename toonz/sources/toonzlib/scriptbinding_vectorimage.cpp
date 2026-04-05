@@ -67,10 +67,18 @@ QScriptValue VectorImage::getStroke(int index) {
   return create(wrapper);
 }
 
+QScriptValue VectorImage::findRegions() {
+  m_vi->findRegions();
+  return context()->thisObject();
+}
+
 QScriptValue VectorImage::fill(double x, double y, int styleId) {
+  // Ensure regions are computed before filling
+  m_vi->findRegions();
+
   TPointD p(x, y);
-  bool filled = m_vi->fill(p, styleId);
-  if (!filled) {
+  int result = m_vi->fill(p, styleId);
+  if (result < 0) {
     return context()->throwError(
         tr("No region found at point (%1, %2)").arg(x).arg(y));
   }
@@ -122,6 +130,10 @@ QScriptValue VectorImage::setPalette(const QScriptValue &paletteArg) {
 }
 
 QScriptValue VectorImage::toImage() {
+  if (!m_vi->getPalette()) {
+    return context()->throwError(
+        tr("VectorImage has no palette set. Call setPalette() first."));
+  }
   TImageP img(m_vi.getPointer());
   return create(new Image(img));
 }
