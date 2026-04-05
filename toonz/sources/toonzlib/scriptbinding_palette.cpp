@@ -1,7 +1,11 @@
 
 
 #include "toonz/scriptbinding_palette.h"
+#include "toonz/scriptbinding_files.h"
 #include "tcolorstyles.h"
+#include "timage_io.h"
+#include "trasterimage.h"
+#include "tsystem.h"
 
 namespace TScriptBinding {
 
@@ -314,6 +318,87 @@ QScriptValue Palette::getAvailableTags() {
     arr.setProperty(i, entry);
   }
   return arr;
+}
+
+QScriptValue Palette::loadColorModel(const QScriptValue &pathArg) {
+  TFilePath fp;
+  QScriptValue err = checkFilePath(context(), pathArg, fp);
+  if (err.isError()) return err;
+
+  if (!TSystem::doesExistFileOrLevel(fp)) {
+    return context()->throwError(
+        tr("File %1 doesn't exist").arg(pathArg.toString()));
+  }
+
+  try {
+    TImageReaderP reader(fp);
+    TImageP img = reader->load();
+    if (!img) {
+      return context()->throwError(
+          tr("Could not load image %1").arg(pathArg.toString()));
+    }
+    m_palette->setRefImg(img);
+    m_palette->setRefImgPath(fp);
+    return context()->thisObject();
+  } catch (...) {
+    return context()->throwError(
+        tr("Exception loading %1").arg(pathArg.toString()));
+  }
+}
+
+QScriptValue Palette::pickColorFromModel(int x, int y) {
+  TImageP img = m_palette->getRefImg();
+  if (!img) {
+    return context()->throwError(tr("No color model loaded"));
+  }
+
+  TRasterImageP ri = img;
+  if (!ri || !ri->getRaster()) {
+    return context()->throwError(
+        tr("Color model is not a raster image"));
+  }
+
+  TRasterP raster = ri->getRaster();
+  if (x < 0 || x >= raster->getLx() || y < 0 || y >= raster->getLy()) {
+    return context()->throwError(
+        tr("Coordinates (%1, %2) out of bounds [0-%3, 0-%4]")
+            .arg(x).arg(y)
+            .arg(raster->getLx() - 1).arg(raster->getLy() - 1));
+  }
+
+  // Read pixel color
+  TRaster32P raster32 = raster;
+  TPixel32 color;
+  if (raster32) {
+    color = raster32->pixels(y)[x];
+  } else {
+    // Try grayscale
+    TRasterGR8P rasterGR = raster;
+    if (rasterGR) {
+      int v   = rasterGR->pixels(y)[x].value;
+      color = TPixel32(v, v, v, 255);
+    } else {
+      return context()->throwError(tr("Unsupported raster format"));
+    }
+  }
+
+  QScriptValue obj = engine()->newObject();
+  obj.setProperty("r", color.r);
+  obj.setProperty("g", color.g);
+  obj.setProperty("b", color.b);
+  obj.setProperty("a", color.m);
+
+  // Also return closest palette style
+  int closestStyle = m_palette->getClosestStyle(color);
+  obj.setProperty("closestStyleId", closestStyle);
+
+  return obj;
+}
+
+QScriptValue Palette::removeColorModel() {
+  m_palette->setRefImg(TImageP());
+  m_palette->setRefImgPath(TFilePath());
+  return context()->thisObject();
 }
 
 int Palette::getStyleCount() const { return m_palette->getStyleCount(); }

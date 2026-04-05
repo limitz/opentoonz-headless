@@ -82,7 +82,15 @@ vi.addStroke(stroke);                   // Add a built Stroke object
 vi.removeStroke(index);                 // Remove by index
 vi.getStroke(index);                    // Get Stroke wrapper at index
 
+// Geometric primitives (auto-generate multiple strokes for fillable shapes)
+vi.addRect(x1, y1, x2, y2, thickness, styleId);
+vi.addCircle(cx, cy, radius, thickness, styleId, segments);  // segments default 16
+vi.addEllipse(cx, cy, rx, ry, thickness, styleId, segments);
+vi.addPolygon(cx, cy, radius, sides, thickness, styleId);
+vi.addLine(x1, y1, x2, y2, thickness, styleId);
+
 // Fill operations (requires regions formed by closed/intersecting strokes)
+vi.findRegions();                       // Compute regions explicitly before fill
 vi.fill(x, y, styleId);                // Flood fill region at point
 vi.setEdgeColors(strokeIdx, left, right); // Set boundary colors
 
@@ -116,9 +124,12 @@ var rc = new RasterCanvas(width, height);  // Create canvas (pixels)
 // Drawing
 rc.brushStroke([[x,y,t], ...], styleId, antialias);  // Draw brush stroke
 rc.fill(x, y, styleId);                  // Flood fill at point
-rc.rectFill(x1, y1, x2, y2, styleId);   // Fill rectangle
+rc.rectFill(x1, y1, x2, y2, styleId);   // Fill rectangle (works on blank canvas)
 rc.inkFill(x, y, styleId, searchRay);    // Fill ink lines at point
 rc.clear();                               // Clear canvas
+
+// Palette (needed for colored output)
+rc.setPalette(palette);                   // Set palette for colored ToonzRaster output
 
 // Convert to Image
 var img = rc.toImage();                   // Returns ToonzRaster Image
@@ -131,6 +142,7 @@ var img = rc.toImage();                   // Returns ToonzRaster Image
 - styleId references palette colors (ink = style index for line color)
 - The brush stroke points should be dense enough for smooth curves
 - antialias parameter (boolean) controls edge smoothing
+- `rectFill()` writes paint values directly — works on blank/cleared canvases
 
 ---
 
@@ -142,9 +154,25 @@ Color management. Each style has a global integer ID used by strokes and fills.
 var pal = new Palette();
 pal.addPage("Page Name");               // Organize colors into pages
 
+// Solid colors
 var styleId = pal.addColor(r, g, b, a); // Add color, returns GLOBAL style ID
 pal.setStyleColor(styleId, r, g, b, a); // Modify existing color
 var c = pal.getStyleColor(styleId);      // Returns {r, g, b, a}
+
+// Advanced styles (gradients, patterns, textures, decorative strokes)
+var sid = pal.addStyle(tagId);           // Create style by tag ID
+pal.getStyleType(styleIdx);              // Returns {tagId, description, isRegionStyle, isStrokeStyle}
+pal.getStyleParamNames(styleIdx);        // Array of {name, type} for each param
+pal.setStyleParam(styleIdx, paramIdx, value);
+pal.getStyleParam(styleIdx, paramIdx);
+pal.setStyleColorParam(styleIdx, colorIdx, r, g, b, a);
+pal.getStyleColorParam(styleIdx, colorIdx);
+pal.getAvailableTags();                  // List all 53 style types with metadata
+
+// Color model (reference image for color picking)
+pal.loadColorModel(path);               // Load reference image (PNG, etc.)
+var c = pal.pickColorFromModel(x, y);   // Returns {r, g, b, a, closestStyleId}
+pal.removeColorModel();                  // Clear reference image
 ```
 
 **Properties:** `styleCount` (int), `pageCount` (int)
@@ -152,8 +180,9 @@ var c = pal.getStyleColor(styleId);      // Returns {r, g, b, a}
 **Important:**
 - A new Palette starts with 2 default styles (indices 0 and 1 — typically transparent and black)
 - `addColor()` returns the global style ID (usually starting at 2)
-- Always call `addPage()` before `addColor()` — colors must belong to a page
+- Palettes start with 1 default page ("colors") — no need to call `addPage()` first
 - Color components are integers 0-255
+- Use `getAvailableTags()` to discover all style types (1138 = linear gradient, 1139 = radial gradient, etc.)
 
 ---
 
@@ -176,8 +205,20 @@ scene.getCell(row, col);                   // Returns {level, fid}
 scene.insertColumn(col);
 scene.deleteColumn(col);
 
-// Stage objects (NEW)
+// Stage objects
 var obj = scene.getStageObject(colIdx);    // Get StageObject for column
+
+// FX graph
+scene.connectEffect(colIdx, effect);       // Wire column → effect → xsheet output
+
+// Camera
+scene.setCameraSize(width, height);        // Set camera resolution in pixels
+var cam = scene.getCameraSize();           // Returns {width, height}
+
+// Motion path splines
+var splineIdx = scene.createSpline([[x,y], [x,y], ...]);  // Min 3 control points
+
+// Settings
 scene.setFrameRate(fps);                   // Set output frame rate
 
 // File I/O
@@ -202,9 +243,14 @@ var img = level.getFrame(frameId);
 var img = level.getFrameByIndex(index);
 var fids = level.getFrameIds();           // Array of frame ID strings
 
-// Palette (NEW)
+// Palette
 level.setPalette(palette);                // Assign palette to level
 var pal = level.getPalette();             // Get level's palette
+
+// Drawing hooks (attachment points for cut-out animation)
+var hookIdx = level.addHook(frameId, x, y);  // Add hook at position, returns index
+var hooks = level.getHooks(frameId);         // Returns array of {index, x, y}
+level.removeHook(hookIdx);                   // Remove hook by index
 
 // File I/O
 level.load(path);
@@ -231,7 +277,7 @@ img.save(path);
 
 ### StageObject
 
-Animate position, rotation, scale per column. Supports bone hierarchy and IK.
+Animate position, rotation, scale per column. Supports bone hierarchy, IK, and motion paths.
 
 ```javascript
 var obj = scene.getStageObject(colIdx);   // Cannot create directly
@@ -244,6 +290,14 @@ obj.setInterpolation(frame, channel, type);
 // Hierarchy
 obj.setParent(otherStageObject);
 obj.setStatus(statusString);              // "xy", "path", "pathAim", "ik"
+
+// Motion path
+obj.setSpline(splineIdx);                 // Assign spline from scene.createSpline()
+
+// Inverse kinematics
+var angles = obj.solveIK(targetX, targetY, frame);
+// Walks parent chain, solves IK (DLS, 250 iterations), applies angle
+// keyframes to each joint. Returns array of solved angles.
 ```
 
 **Channels:** `"x"`, `"y"`, `"z"`, `"angle"` (or `"rotation"`), `"scalex"`, `"scaley"`, `"scale"`, `"shearx"`, `"sheary"`, `"so"` (stacking order), `"path"`
@@ -292,6 +346,8 @@ rig.setVertexKeyframe(vertexIdx, frame, param, value);
 
 **Properties:** `vertexCount` (int)
 
+**Note:** The skeleton is automatically attached to the deformation system — `addVertex()` creates vertex deformation entries so `setVertexKeyframe()` works immediately.
+
 ---
 
 ### Effect
@@ -325,6 +381,8 @@ fx.setParamKeyframe(name, frame, value);  // Animate parameter
 
 Use `fx.getParamNames()` to discover all parameters for any effect.
 
+**Connecting to scene:** Use `scene.connectEffect(colIdx, effect)` to wire a column through an effect into the xsheet output.
+
 ---
 
 ### Rasterizer (built-in)
@@ -351,13 +409,18 @@ var rasterLevel = rast.rasterize(vectorLevel);
 
 ### Renderer (built-in)
 
-Render complete scenes (compositing all layers, effects, camera).
+Render complete scenes (compositing all layers, effects, camera). Works in headless mode.
 
 ```javascript
 var renderer = new Renderer();
-var outputLevel = renderer.renderScene(scene);
-var singleFrame = renderer.renderFrame(scene, frameNumber);
+var singleFrame = renderer.renderFrame(scene, frameNumber);  // Returns raster Image
+var outputLevel = renderer.renderScene(scene);                // Returns Level with all frames
 ```
+
+**Tips:**
+- Set camera size first: `scene.setCameraSize(1920, 1080)` controls output resolution
+- The returned Image may show "Empty" in `toString()` on the same eval due to async timing — access `type`/`width`/`height` in the next eval for correct values
+- Rendering uses the TRenderer thread pool with proper event loop handling
 
 ---
 
@@ -508,6 +571,54 @@ obj.setInterpolation(12, "y", "easeInOut");
 
 // Set frame rate
 scene.setFrameRate(24);
+```
+
+### Render a Scene to PNG
+
+```javascript
+// 1. Create scene with camera
+var scene = new Scene();
+scene.setCameraSize(512, 512);
+
+// 2. Create content
+var level = scene.newLevel("Vector", "ball");
+var pal = new Palette();
+var ink = pal.addColor(0, 0, 0, 255);
+var vi = new VectorImage();
+vi.addCircle(0, 0, 40, 2, ink);          // Geometric primitive
+vi.setPalette(pal);
+level.setFrame(1, vi.toImage());
+scene.setCell(0, 0, level, 1);
+
+// 3. Render
+var renderer = new Renderer();
+var img = renderer.renderFrame(scene, 0);
+// Access properties in next eval due to async timing
+```
+```javascript
+img.save("/tmp/rendered_ball.png");
+```
+
+### Render with Effects
+
+```javascript
+var scene = new Scene();
+scene.setCameraSize(256, 256);
+var lv = scene.newLevel("Vector", "fx_demo");
+var pal = new Palette(); var ink = pal.addColor(0, 0, 0, 255);
+var vi = new VectorImage();
+vi.addRect(-50, -5, 50, 5, 2, ink);
+vi.setPalette(pal);
+lv.setFrame(1, vi.toImage());
+scene.setCell(0, 0, lv, 1);
+
+// Apply blur effect to column 0
+var blur = new Effect("STD_blurFx");
+blur.setParam("value", 10);
+scene.connectEffect(0, blur);
+
+var renderer = new Renderer();
+var img = renderer.renderFrame(scene, 0);
 ```
 
 ### Create a Particle Effect

@@ -1190,7 +1190,31 @@ def test_rasterizer():
 #         try { var renderer = new Renderer(); var level = renderer.renderScene(scene); print(level ? "ok fc="+level.frameCount : "null"); } catch(e) { print("error:"+e); }''',
 #     ], lambda r: (True, f"out={output_of(r)} [may timeout - known issue]"), group=G)
 def test_renderer():
-    pass  # Skipped — see G4
+    G = "Renderer (Scene rendering)"
+
+    # Renderer now works in headless mode via synchronous event-loop wait
+    test("Renderer renderFrame", [
+        '''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var lv = scene.newLevel("Vector", "rnd");
+        var p = new Palette(); var ink = p.addColor(0,0,0,255);
+        var vi = new VectorImage(); var s = new Stroke(); s.addPoints([[-40,0,3],[40,0,3]]); s.build(); s.setStyle(ink); vi.addStroke(s); vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var renderer = new Renderer(); var img = renderer.renderFrame(scene, 0);
+        print("rendered")''',
+        'print("type=" + img.type + " " + img.width + "x" + img.height)',
+    ], lambda r: ("type=Raster" in output_of(r, 1), f"out={output_of(r, 1)}"), group=G)
+
+    test("Renderer renderScene (full)", [
+        '''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var lv = scene.newLevel("Vector", "rns");
+        var p = new Palette(); var ink = p.addColor(0,0,0,255);
+        var vi = new VectorImage(); var s = new Stroke(); s.addPoints([[-40,0,3],[40,0,3]]); s.build(); s.setStyle(ink); vi.addStroke(s); vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var renderer = new Renderer(); var level = renderer.renderScene(scene);
+        print(level ? "ok fc="+level.frameCount : "null")''',
+    ], lambda r: ("ok fc=" in output_of(r), f"out={output_of(r)}"), group=G)
 
 
 # ============================================================
@@ -1463,11 +1487,11 @@ def test_full_pipeline():
 
 
 # ============================================================
-#  NEW FEATURE TESTS (G6, G7, G10, G11, G16)
+#  NEW FEATURE TESTS (G6, G7, G8, G9, G10, G11, G16)
 # ============================================================
 
 def test_new_features():
-    G = "New Features (G6, G7, G10, G11, G16)"
+    G = "New Features (G6, G7, G8, G9, G10, G11, G16)"
 
     # G11: RasterCanvas rectFill on blank canvas
     test("G11: RasterCanvas rectFill on blank canvas", [
@@ -1567,6 +1591,60 @@ def test_new_features():
         'try { scene.createSpline([[0,0],[1,1]]); print("no error"); } catch(e) { print("error"); }',
     ], lambda r: (output_of(r, 1) == "error", f"out={output_of(r, 1)}"), group=G)
 
+    # G8: IK solver
+    test("G8: solveIK on 3-bone chain", [
+        '''var scene = new Scene();
+        scene.newLevel("Vector", "ik1"); scene.newLevel("Vector", "ik2"); scene.newLevel("Vector", "ik3");
+        scene.setCell(0, 0, scene.getLevel("ik1"), 1);
+        scene.setCell(0, 1, scene.getLevel("ik2"), 1);
+        scene.setCell(0, 2, scene.getLevel("ik3"), 1);
+        var root = scene.getStageObject(0);
+        var mid = scene.getStageObject(1);
+        var tip = scene.getStageObject(2);
+        root.setKeyframe(0, "x", 0); root.setKeyframe(0, "y", 0);
+        mid.setKeyframe(0, "x", 50); mid.setKeyframe(0, "y", 0);
+        tip.setKeyframe(0, "x", 100); tip.setKeyframe(0, "y", 0);
+        mid.setParent(root);
+        tip.setParent(mid);
+        var angles = tip.solveIK(80, 30, 0);
+        print("solved=" + (angles !== undefined && angles !== null ? "ok" : "fail"))''',
+    ], lambda r: ("solved=ok" in output_of(r), f"out={output_of(r)}"), group=G)
+
+    test("G8: solveIK on single object (table is implicit parent)", [
+        '''var scene = new Scene(); scene.newLevel("Vector", "ik_single");
+        scene.setCell(0, 0, scene.getLevel("ik_single"), 1);
+        var obj = scene.getStageObject(0);
+        obj.setKeyframe(0, "x", 50); obj.setKeyframe(0, "y", 0);
+        var angles = obj.solveIK(30, 30, 0);
+        print("solved=" + (angles !== undefined ? "ok" : "fail"))''',
+    ], lambda r: ("solved=ok" in output_of(r), f"out={output_of(r)}"), group=G)
+
+    # G9: Color model
+    test("G9: Palette loadColorModel + pickColorFromModel", [
+        # Create a small test image first
+        '''var rc = new RasterCanvas(16, 16);
+        var pal = new Palette(); var red = pal.addColor(255, 0, 0); rc.setPalette(pal);
+        rc.rectFill(0, 0, 15, 15, red);
+        var img = rc.toImage();''' + f'''
+        img.save("{TESTDIR}/test_colormodel.png"); print("saved")''',
+        f'''var pal2 = new Palette(); pal2.addColor(255, 0, 0); pal2.addColor(0, 255, 0);
+        pal2.loadColorModel("{TESTDIR}/test_colormodel.png");
+        var c = pal2.pickColorFromModel(8, 8);
+        print("r=" + c.r + " closest=" + c.closestStyleId)''',
+    ], lambda r: ("r=" in output_of(r, 1), f"out={output_of(r, 1)}"), group=G)
+
+    test("G9: Palette removeColorModel", [
+        '''var pal = new Palette();''' + f'''
+        pal.loadColorModel("{TESTDIR}/test_colormodel.png");
+        pal.removeColorModel();
+        try {{ var c = pal.pickColorFromModel(0, 0); print("no error"); }} catch(e) {{ print("error"); }}''',
+    ], lambda r: (output_of(r) == "error", f"out={output_of(r)}"), group=G)
+
+    test("G9: pickColorFromModel without loading errors", [
+        'var pal = new Palette()',
+        'try { pal.pickColorFromModel(0, 0); print("no error"); } catch(e) { print("error"); }',
+    ], lambda r: (output_of(r, 1) == "error", f"out={output_of(r, 1)}"), group=G)
+
 
 # ============================================================
 #  MISSING WORKFLOW FEATURES (gaps)
@@ -1575,20 +1653,28 @@ def test_new_features():
 def test_missing_features():
     G = "Missing/Untestable Workflow Features (Gaps)"
 
-    # Step 2: Color Model - no API exposure
-    test("[GAP] Color Model viewer - no headless API", [
-        'print("Color Model (reference image loading, pick modes) has no headless API binding")',
-    ], lambda r: (True, "NO API - Color Model viewer not exposed"), group=G)
+    # Step 2: Color Model — IMPLEMENTED (G9)
+    test("[IMPLEMENTED] Color Model (loadColorModel/pickColorFromModel)", [
+        f'''var pal = new Palette(); pal.addColor(128, 128, 128);
+        pal.loadColorModel("{TESTDIR}/test_colormodel.png");
+        var c = pal.pickColorFromModel(0, 0); print("r=" + c.r)''',
+    ], lambda r: ("r=" in output_of(r), f"out={output_of(r)}"), group=G)
 
     # Step 6: Onion Skin - no API exposure
     test("[GAP] Onion Skin overlay - no headless API", [
         'print("Onion Skin (MOS/FOS/ShiftTrace) has no headless API binding")',
     ], lambda r: (True, "NO API - Onion Skin not exposed"), group=G)
 
-    # Step 10: Skeleton/Bone rig - columns + hooks
-    test("[GAP] Skeleton Tool bone hierarchy via hooks", [
-        'print("Skeleton Tool IK/bones via hook connections not exposed in headless")',
-    ], lambda r: (True, "NO API - Skeleton Tool / IK solver not exposed"), group=G)
+    # Step 10: Skeleton/Bone rig — IMPLEMENTED (G8)
+    test("[IMPLEMENTED] IK solver (solveIK on parent chain)", [
+        '''var scene = new Scene();
+        scene.newLevel("Vector","sk1"); scene.newLevel("Vector","sk2");
+        scene.setCell(0,0,scene.getLevel("sk1"),1); scene.setCell(0,1,scene.getLevel("sk2"),1);
+        var a = scene.getStageObject(0); var b = scene.getStageObject(1);
+        a.setKeyframe(0,"x",0); a.setKeyframe(0,"y",0);
+        b.setKeyframe(0,"x",50); b.setKeyframe(0,"y",0);
+        b.setParent(a); var r = b.solveIK(30, 30, 0); print("ok")''',
+    ], lambda r: (output_of(r) == "ok", f"out={output_of(r)}"), group=G)
 
     # Step 13: Motion Paths (splines) — IMPLEMENTED (G6)
     test("[IMPLEMENTED] Motion Path spline creation + assignment", [

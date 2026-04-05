@@ -350,7 +350,9 @@ void PlasticDeformerFx::doCompute(TTile &tile, double frame,
     if (QOpenGLContext::currentContext())
       context->setShareContext(QOpenGLContext::currentContext());
 
-    context->setFormat(QSurfaceFormat::defaultFormat());
+    QSurfaceFormat ctxFmt;
+    ctxFmt.setProfile(QSurfaceFormat::CompatibilityProfile);
+    context->setFormat(ctxFmt);
 
     if (!context->create()) {
       TSysLog::error("PlasticDeformerFx: Failed to create OpenGL context");
@@ -358,7 +360,21 @@ void PlasticDeformerFx::doCompute(TTile &tile, double frame,
       return;
     }
 
-    if (!context->makeCurrent(info.m_offScreenSurface.get())) {
+    // In headless mode, info.m_offScreenSurface is null (only created in
+    // GUI threads). Create a local QOffscreenSurface as fallback, matching
+    // the pattern used by QtOfflineGL::createContext().
+    std::unique_ptr<QOffscreenSurface> localSurface;
+    QOffscreenSurface *surface = info.m_offScreenSurface.get();
+    if (!surface) {
+      localSurface.reset(new QOffscreenSurface());
+      QSurfaceFormat fmt;
+      fmt.setProfile(QSurfaceFormat::CompatibilityProfile);
+      localSurface->setFormat(fmt);
+      localSurface->create();
+      surface = localSurface.get();
+    }
+
+    if (!context->makeCurrent(surface)) {
       TSysLog::error("PlasticDeformerFx: Failed to make context current");
       tile.getRaster()->clear();
       return;
