@@ -12,8 +12,9 @@
 #include "toonz/sceneproperties.h"
 #include "toonz/tcamera.h"
 #include "toutputproperties.h"
+#include <QThread>
 #include <QEventLoop>
-#include <QWaitCondition>
+#include <QCoreApplication>
 
 #include "timagecache.h"
 
@@ -49,7 +50,7 @@ public:
   TScriptBinding::Level *m_outputLevel;
   TPointD m_cameraDpi;
 
-  bool m_completed;
+  volatile bool m_completed;
   TRenderer m_renderer;
 
   QList<int> m_columnList;
@@ -118,18 +119,16 @@ public:
   }
 
   void render(std::vector<TRenderer::RenderData> *rds) {
-    QMutex mutex;
-    mutex.lock();
     m_completed = false;
     m_renderer.startRendering(rds);
 
-    while (!m_completed) {
-      QEventLoop loop;
-      loop.processEvents();
-      QWaitCondition waitCondition;
-      waitCondition.wait(&mutex, 100);
+    // Spin-wait with event processing so TRenderer's queued signal
+    // (Qt::QueuedConnection) gets delivered. onRenderFinished() sets
+    // m_completed from the worker thread.
+    int maxIter = 600;  // 30 second timeout
+    while (!m_completed && maxIter-- > 0) {
+      QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
     }
-    mutex.unlock();
   }
 
   void renderFrame(ToonzScene *scene, int row, Image *outputImage) {

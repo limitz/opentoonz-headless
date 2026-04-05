@@ -1167,30 +1167,32 @@ def test_rasterizer():
 #  RENDERER
 # ============================================================
 
-# COMMENTED OUT: Renderer tests hang/timeout in headless mode (G4 — known issue)
-# Uncomment after implementing headless GL context or alternative rendering path.
-# def test_renderer():
-#     G = "Renderer (Scene rendering)"
-#
-#     test("Renderer renderFrame", [
-#         '''var scene = new Scene(); var lv = scene.newLevel("Vector", "rnd");
-#         var p = new Palette(); p.addPage("X"); var ink = p.addColor(0,0,0,255);
-#         var vi = new VectorImage(); var s = new Stroke(); s.addPoints([[-40,0,3],[40,0,3]]); s.build(); s.setStyle(ink); vi.addStroke(s); vi.setPalette(p);
-#         lv.setFrame(1, vi.toImage());
-#         scene.setCell(0, 0, lv, 1);
-#         try { var renderer = new Renderer(); var img = renderer.renderFrame(scene, 0); print(img ? "ok type="+img.type+" "+img.width+"x"+img.height : "null"); } catch(e) { print("error:"+e); }''',
-#     ], lambda r: (True, f"out={output_of(r)} [may timeout - known issue]"), group=G)
-#
-#     test("Renderer renderScene (full)", [
-#         '''var scene = new Scene(); var lv = scene.newLevel("Vector", "rns");
-#         var p = new Palette(); p.addPage("X"); var ink = p.addColor(0,0,0,255);
-#         var vi = new VectorImage(); var s = new Stroke(); s.addPoints([[-40,0,3],[40,0,3]]); s.build(); s.setStyle(ink); vi.addStroke(s); vi.setPalette(p);
-#         lv.setFrame(1, vi.toImage());
-#         scene.setCell(0, 0, lv, 1);
-#         try { var renderer = new Renderer(); var level = renderer.renderScene(scene); print(level ? "ok fc="+level.frameCount : "null"); } catch(e) { print("error:"+e); }''',
-#     ], lambda r: (True, f"out={output_of(r)} [may timeout - known issue]"), group=G)
 def test_renderer():
-    pass  # Skipped — see G4
+    G = "Renderer (Scene rendering)"
+
+    # Renderer now works in headless mode via synchronous event-loop wait
+    test("Renderer renderFrame", [
+        '''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var lv = scene.newLevel("Vector", "rnd");
+        var p = new Palette(); var ink = p.addColor(0,0,0,255);
+        var vi = new VectorImage(); var s = new Stroke(); s.addPoints([[-40,0,3],[40,0,3]]); s.build(); s.setStyle(ink); vi.addStroke(s); vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var renderer = new Renderer(); var img = renderer.renderFrame(scene, 0);
+        print("rendered")''',
+        'print("type=" + img.type + " " + img.width + "x" + img.height)',
+    ], lambda r: ("type=Raster" in output_of(r, 1), f"out={output_of(r, 1)}"), group=G)
+
+    test("Renderer renderScene (full)", [
+        '''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var lv = scene.newLevel("Vector", "rns");
+        var p = new Palette(); var ink = p.addColor(0,0,0,255);
+        var vi = new VectorImage(); var s = new Stroke(); s.addPoints([[-40,0,3],[40,0,3]]); s.build(); s.setStyle(ink); vi.addStroke(s); vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var renderer = new Renderer(); var level = renderer.renderScene(scene);
+        print(level ? "ok fc="+level.frameCount : "null")''',
+    ], lambda r: ("ok fc=" in output_of(r), f"out={output_of(r)}"), group=G)
 
 
 # ============================================================
