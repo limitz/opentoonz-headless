@@ -128,4 +128,12 @@ int Effect::getParamCount() const {
   return m_fx->getParams()->getParamCount();
 }
 
+QScriptValue checkEffect(QScriptContext *context, const QScriptValue &value,
+                         Effect *&out) {
+  out = qscriptvalue_cast<Effect *>(value);
+  if (!out)
+    return context->throwError(QObject::tr("Expected an Effect object"));
+  return QScriptValue();
+}
+
 }  // namespace TScriptBinding

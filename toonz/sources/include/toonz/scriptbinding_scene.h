@@ -46,6 +46,10 @@ public:
   // Stage object access
   Q_INVOKABLE QScriptValue getStageObject(int colIdx);
 
+  // FX graph
+  Q_INVOKABLE QScriptValue connectEffect(int colIdx,
+                                         const QScriptValue &effectArg);
+
   // Frame rate
   Q_INVOKABLE QScriptValue setFrameRate(double fps);
 

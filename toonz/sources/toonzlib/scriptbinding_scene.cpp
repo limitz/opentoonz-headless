@@ -4,6 +4,7 @@
 #include "toonz/scriptbinding_level.h"
 #include "toonz/scriptbinding_files.h"
 #include "toonz/scriptbinding_stageobject.h"
+#include "toonz/scriptbinding_effect.h"
 #include "toonz/txshleveltypes.h"
 
 #include "tsystem.h"
@@ -13,9 +14,13 @@
 #include "toonz/toonzscene.h"
 #include "toonz/txsheet.h"
 #include "toonz/txshcell.h"
+#include "toonz/txshcolumn.h"
 #include "toonz/levelset.h"
 #include "toonz/tstageobjecttree.h"
 #include "toonz/sceneproperties.h"
+#include "toonz/fxdag.h"
+#include "toonz/tcolumnfxset.h"
+#include "tfx.h"
 #include "toutputproperties.h"
 
 namespace TScriptBinding {
@@ -250,6 +255,58 @@ QScriptValue Scene::getStageObject(int colIdx) {
         tr("Cannot get stage object for column %1").arg(colIdx));
   }
   return create(new StageObject(obj));
+}
+
+QScriptValue Scene::connectEffect(int colIdx, const QScriptValue &effectArg) {
+  Effect *eff = nullptr;
+  QScriptValue err = checkEffect(context(), effectArg, eff);
+  if (err.isError()) return err;
+
+  TXsheet *xsh = m_scene->getXsheet();
+  if (colIdx < 0 || colIdx >= xsh->getColumnCount()) {
+    return context()->throwError(
+        tr("Column index %1 out of range [0, %2)")
+            .arg(colIdx)
+            .arg(xsh->getColumnCount()));
+  }
+
+  TXshColumn *col = xsh->getColumn(colIdx);
+  if (!col) {
+    return context()->throwError(
+        tr("Column %1 does not exist").arg(colIdx));
+  }
+
+  TFx *columnFx = col->getFx();
+  if (!columnFx) {
+    return context()->throwError(
+        tr("Column %1 has no FX node").arg(colIdx));
+  }
+
+  TFxP fx = eff->getFx();
+  if (!fx) {
+    return context()->throwError(tr("Effect is null"));
+  }
+
+  FxDag *fxDag = xsh->getFxDag();
+
+  // Assign unique ID and register in the DAG
+  fxDag->assignUniqueId(fx.getPointer());
+  fxDag->getInternalFxs()->addFx(fx.getPointer());
+
+  // Wire: column FX -> effect's first input port
+  if (fx->getInputPortCount() > 0) {
+    fx->getInputPort(0)->setFx(columnFx);
+  } else {
+    return context()->throwError(
+        tr("Effect '%1' has no input ports")
+            .arg(QString::fromStdString(fx->getFxType())));
+  }
+
+  // Disconnect column from xsheet output (if connected) and connect effect
+  fxDag->removeFromXsheet(columnFx);
+  fxDag->addToXsheet(fx.getPointer());
+
+  return context()->thisObject();
 }
 
 QScriptValue Scene::setFrameRate(double fps) {

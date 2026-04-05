@@ -38,6 +38,9 @@ public:
   TFxP getFx() const { return m_fx; }
 };
 
+QScriptValue checkEffect(QScriptContext *context, const QScriptValue &value,
+                         Effect *&out);
+
 }  // namespace TScriptBinding
 
 Q_DECLARE_METATYPE(TScriptBinding::Effect *)

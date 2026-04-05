@@ -4,6 +4,7 @@
 #include "toonz/scriptbinding_stroke.h"
 #include "toonz/scriptbinding_image.h"
 #include "toonz/scriptbinding_palette.h"
+#include <cmath>
 
 namespace TScriptBinding {
 
@@ -118,6 +119,94 @@ QScriptValue VectorImage::merge(const QScriptValue &otherArg) {
 
   TAffine identity;
   m_vi->mergeImage(other->getVectorImage(), identity);
+  return context()->thisObject();
+}
+
+// Helper: add a single built stroke to this VectorImage
+static void addBuiltStroke(TVectorImageP &vi, const std::vector<TThickPoint> &pts,
+                           int styleId) {
+  TStroke *s = new TStroke(pts);
+  s->setStyle(styleId);
+  vi->addStroke(s);
+}
+
+QScriptValue VectorImage::addLine(double x1, double y1, double x2, double y2,
+                                  double thickness, int styleId) {
+  std::vector<TThickPoint> pts = {TThickPoint(x1, y1, thickness),
+                                  TThickPoint(x2, y2, thickness)};
+  addBuiltStroke(m_vi, pts, styleId);
+  return context()->thisObject();
+}
+
+QScriptValue VectorImage::addRect(double x1, double y1, double x2, double y2,
+                                  double thickness, int styleId) {
+  // 4 edge strokes forming a fillable rectangle
+  std::vector<TThickPoint> top = {TThickPoint(x1, y1, thickness),
+                                  TThickPoint(x2, y1, thickness)};
+  std::vector<TThickPoint> right = {TThickPoint(x2, y1, thickness),
+                                    TThickPoint(x2, y2, thickness)};
+  std::vector<TThickPoint> bottom = {TThickPoint(x2, y2, thickness),
+                                     TThickPoint(x1, y2, thickness)};
+  std::vector<TThickPoint> left = {TThickPoint(x1, y2, thickness),
+                                   TThickPoint(x1, y1, thickness)};
+  addBuiltStroke(m_vi, top, styleId);
+  addBuiltStroke(m_vi, right, styleId);
+  addBuiltStroke(m_vi, bottom, styleId);
+  addBuiltStroke(m_vi, left, styleId);
+  return context()->thisObject();
+}
+
+QScriptValue VectorImage::addCircle(double cx, double cy, double radius,
+                                    double thickness, int styleId,
+                                    int segments) {
+  if (segments < 3) segments = 3;
+  // Generate arc strokes between adjacent points
+  double step = 2.0 * M_PI / segments;
+  for (int i = 0; i < segments; i++) {
+    double a0 = i * step;
+    double a1 = (i + 1) * step;
+    double amid = (a0 + a1) / 2.0;
+    // Use 3 points per segment for smooth Bezier arcs
+    std::vector<TThickPoint> pts = {
+        TThickPoint(cx + radius * cos(a0), cy + radius * sin(a0), thickness),
+        TThickPoint(cx + radius * cos(amid), cy + radius * sin(amid), thickness),
+        TThickPoint(cx + radius * cos(a1), cy + radius * sin(a1), thickness)};
+    addBuiltStroke(m_vi, pts, styleId);
+  }
+  return context()->thisObject();
+}
+
+QScriptValue VectorImage::addEllipse(double cx, double cy, double rx,
+                                     double ry, double thickness, int styleId,
+                                     int segments) {
+  if (segments < 3) segments = 3;
+  double step = 2.0 * M_PI / segments;
+  for (int i = 0; i < segments; i++) {
+    double a0 = i * step;
+    double a1 = (i + 1) * step;
+    double amid = (a0 + a1) / 2.0;
+    std::vector<TThickPoint> pts = {
+        TThickPoint(cx + rx * cos(a0), cy + ry * sin(a0), thickness),
+        TThickPoint(cx + rx * cos(amid), cy + ry * sin(amid), thickness),
+        TThickPoint(cx + rx * cos(a1), cy + ry * sin(a1), thickness)};
+    addBuiltStroke(m_vi, pts, styleId);
+  }
+  return context()->thisObject();
+}
+
+QScriptValue VectorImage::addPolygon(double cx, double cy, double radius,
+                                     int sides, double thickness, int styleId) {
+  if (sides < 3) sides = 3;
+  // Each side is a straight edge (2-point stroke)
+  double step = 2.0 * M_PI / sides;
+  for (int i = 0; i < sides; i++) {
+    double a0 = i * step - M_PI / 2;  // Start at top
+    double a1 = (i + 1) * step - M_PI / 2;
+    std::vector<TThickPoint> pts = {
+        TThickPoint(cx + radius * cos(a0), cy + radius * sin(a0), thickness),
+        TThickPoint(cx + radius * cos(a1), cy + radius * sin(a1), thickness)};
+    addBuiltStroke(m_vi, pts, styleId);
+  }
   return context()->thisObject();
 }
 

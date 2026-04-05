@@ -21,11 +21,26 @@ public:
   WRAPPER_STD_METHODS(Palette)
   Q_INVOKABLE QScriptValue toString();
 
-  // Color management
+  // Color management (solid colors)
   Q_INVOKABLE QScriptValue addColor(int r, int g, int b, int a = 255);
   Q_INVOKABLE QScriptValue setStyleColor(int styleIdx, int r, int g, int b,
                                          int a = 255);
   Q_INVOKABLE QScriptValue getStyleColor(int styleIdx);
+
+  // Style system (gradients, patterns, textures, decorative strokes, etc.)
+  Q_INVOKABLE QScriptValue addStyle(int tagId);
+  Q_INVOKABLE QScriptValue getStyleType(int styleIdx);
+  Q_INVOKABLE QScriptValue getStyleParamCount(int styleIdx);
+  Q_INVOKABLE QScriptValue getStyleParamNames(int styleIdx);
+  Q_INVOKABLE QScriptValue setStyleParam(int styleIdx, int paramIdx,
+                                         const QScriptValue &value);
+  Q_INVOKABLE QScriptValue getStyleParam(int styleIdx, int paramIdx);
+  Q_INVOKABLE QScriptValue getStyleColorParamCount(int styleIdx);
+  Q_INVOKABLE QScriptValue setStyleColorParam(int styleIdx, int colorIdx,
+                                              int r, int g, int b,
+                                              int a = 255);
+  Q_INVOKABLE QScriptValue getStyleColorParam(int styleIdx, int colorIdx);
+  Q_INVOKABLE QScriptValue getAvailableTags();
 
   // Page management
   Q_INVOKABLE QScriptValue addPage(const QString &name);
