@@ -12,9 +12,10 @@
 #include "toonz/sceneproperties.h"
 #include "toonz/tcamera.h"
 #include "toutputproperties.h"
+#include <QMutex>
+#include <QMutexLocker>
+#include <QWaitCondition>
 #include <QThread>
-#include <QEventLoop>
-#include <QCoreApplication>
 
 #include "timagecache.h"
 
@@ -46,11 +47,17 @@ static void valueToIntList(const QScriptValue &arr, QList<int> &list) {
 
 class Renderer::Imp final : public TRenderPort {
 public:
-  TScriptBinding::Image *m_outputImage;
-  TScriptBinding::Level *m_outputLevel;
   TPointD m_cameraDpi;
 
-  volatile bool m_completed;
+  QMutex m_mutex;
+  QWaitCondition m_condition;
+  bool m_completed;
+
+  // Rendered results — written on the worker thread under m_mutex,
+  // read on the main thread after m_completed is set.
+  TImageP m_resultImage;
+  QList<QPair<TFrameId, TImageP>> m_resultFrames;
+
   TRenderer m_renderer;
 
   QList<int> m_columnList;
@@ -59,8 +66,6 @@ public:
   Imp() : m_completed(false) {
     m_renderer.setThreadsCount(1);
     m_renderer.addPort(this);
-    m_outputImage = 0;
-    m_outputLevel = 0;
   }
 
   ~Imp() {}
@@ -119,25 +124,31 @@ public:
   }
 
   void render(std::vector<TRenderer::RenderData> *rds) {
-    m_completed = false;
+    {
+      QMutexLocker locker(&m_mutex);
+      m_completed   = false;
+      m_resultImage = TImageP();
+      m_resultFrames.clear();
+    }
+
     m_renderer.startRendering(rds);
 
-    // Spin-wait with event processing so TRenderer's queued signal
-    // (Qt::QueuedConnection) gets delivered. onRenderFinished() sets
-    // m_completed from the worker thread.
-    int maxIter = 600;  // 30 second timeout
-    while (!m_completed && maxIter-- > 0) {
-      QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    // Wait for the worker thread to signal completion.
+    QMutexLocker locker(&m_mutex);
+    while (!m_completed) {
+      m_condition.wait(&m_mutex, 30000);  // 30s timeout
+      break;  // either signaled or timed out
     }
   }
 
-  void renderFrame(ToonzScene *scene, int row, Image *outputImage) {
+  TImageP renderFrame(ToonzScene *scene, int row) {
     setRenderArea(scene);
     std::vector<int> rows;
     rows.push_back(row);
-    m_outputImage = outputImage;
-    m_outputLevel = 0;
     render(makeRenderData(scene, rows));
+
+    QMutexLocker locker(&m_mutex);
+    return m_resultImage;
   }
 
   void renderScene(ToonzScene *scene, Level *outputLevel) {
@@ -149,36 +160,39 @@ public:
       for (int i = 0; i < m_frameList.length(); i++)
         rows.push_back(m_frameList[i]);
     }
-    m_outputImage = 0;
-    m_outputLevel = outputLevel;
     render(makeRenderData(scene, rows));
+
+    QMutexLocker locker(&m_mutex);
+    for (const auto &pair : m_resultFrames)
+      outputLevel->setFrame(pair.first, pair.second);
   }
 
-  void onRenderRasterStarted(const RenderData &renderData) override {
-    int a = 1;
-  }
+  // --- TRenderPort callbacks (called on the worker thread) ---
+
+  void onRenderRasterStarted(const RenderData &renderData) override {}
+
   void onRenderRasterCompleted(const RenderData &renderData) override {
     TRasterP outputRaster = renderData.m_rasA;
     TRasterImageP img(outputRaster->clone());
     img->setDpi(m_cameraDpi.x, m_cameraDpi.y);
-    if (m_outputImage)
-      m_outputImage->setImg(img);
-    else if (m_outputLevel) {
-      std::vector<std::string> ids;
-      for (int i = 0; i < (int)renderData.m_frames.size(); i++) {
-        TFrameId fid((int)(renderData.m_frames[i]) + 1);
-        m_outputLevel->setFrame(fid, img);
-        std::string id = m_outputLevel->getSimpleLevel()->getImageId(fid);
-        ids.push_back(id);
-      }
-      img = TImageP();
-      for (int i = 0; i < (int)ids.size(); i++)
-        TImageCache::instance()->compress(ids[i]);
+
+    QMutexLocker locker(&m_mutex);
+    m_resultImage = img;
+    for (int i = 0; i < (int)renderData.m_frames.size(); i++) {
+      TFrameId fid((int)(renderData.m_frames[i]) + 1);
+      m_resultFrames.append(qMakePair(fid, TImageP(img)));
     }
   }
-  void onRenderFailure(const RenderData &renderData, TException &e) override {}
-  void onRenderFinished() { m_completed = true; }
-};  // class RenderEngine
+
+  void onRenderFailure(const RenderData &renderData,
+                        TException &e) override {}
+
+  void onRenderFinished(bool isCanceled = false) override {
+    QMutexLocker locker(&m_mutex);
+    m_completed = true;
+    m_condition.wakeAll();
+  }
+};
 
 //=======================================================
 
@@ -205,27 +219,8 @@ QScriptValue Renderer::renderScene(const QScriptValue &sceneArg) {
   if (err.isError()) return err;
 
   Level *outputLevel = new Level();
-  // engine()->collectGarbage();
   m_imp->renderScene(scene->getToonzScene(), outputLevel);
   return create(engine(), outputLevel);
-  /*
-for(int row=0;row<scene->getToonzScene()->getFrameCount();row++)
-{
-engine()->collectGarbage();
-TImageP img = renderEngine.renderFrame(row);
-if(img)
-{
-  QScriptValue frame = create(new Image(img));
-  QScriptValueList args; args << QString::number(row+1) << frame;
-  newLevel.property("setFrame").call(newLevel, args);
-}
-else
-{
-  return context()->throwError(tr("Render failed"));
-}
-}
-return newLevel;
-*/
 }
 
 Q_INVOKABLE QScriptValue Renderer::renderFrame(const QScriptValue &sceneArg,
@@ -237,104 +232,13 @@ Q_INVOKABLE QScriptValue Renderer::renderFrame(const QScriptValue &sceneArg,
   QScriptValue err = getScene(context(), sceneArg, scene);
   if (err.isError()) return err;
 
+  TImageP img = m_imp->renderFrame(scene->getToonzScene(), frame);
+
   Image *outputImage = new Image();
-  engine()->collectGarbage();
-  m_imp->renderFrame(scene->getToonzScene(), frame, outputImage);
+  if (img) outputImage->setImg(img);
   return create(engine(), outputImage);
-
-  /*
-Scene *scene = 0;
-QScriptValue err = getScene(context(), sceneArg, scene);
-if(err.isError()) return err;
-
-
-
-
-engine()->collectGarbage();
-
-RenderEngine renderEngine(scene->getToonzScene());
-TImageP img = renderEngine.renderFrame(frame);
-
-for(int i=0;i<oldStatus.length();i++)
-xsh->getColumn(i)->setPreviewVisible(oldStatus[i]);
-
-if(img)
-{
-return create(engine(), new Image(img));
-}
-else
-{
-return context()->throwError(tr("Render failed"));
-}
-*/
 }
 
-/*
-  QScriptValue Renderer::renderColumns(const QScriptValue &sceneArg, const
-  QScriptValue &columnListArg)
-  {
-    Scene *scene = 0;
-    QScriptValue err = getScene(context(), sceneArg, scene);
-    if(err.isError()) return err;
-
-    QList<bool> oldStatus;
-    QList<bool> newStatus;
-    TXsheet *xsh = scene->getToonzScene()->getXsheet();
-    for(int i=0;i<xsh->getColumnCount();i++)
-    {
-      oldStatus.append(xsh->getColumn(i)->isPreviewVisible());
-      newStatus.append(false);
-    }
-
-    if(!columnListArg.isArray())
-      return context()->throwError(tr("Second argument must be an array of
-  column indices : ").arg(columnListArg.toString()));
-    int m = columnListArg.property("length").toInt32();
-    for(quint32 i=0;i<(int)m;i++)
-    {
-      QScriptValue c = columnListArg.property(i);
-      if(!c.isNumber())
-      {
-        return context()->throwError(tr("Second argument must be an array of
-  integer numbers : %1 (#%2)")
-          .arg(columnListArg.toString())
-          .arg(i));
-      }
-      int index = c.toInteger();
-      if(0<=index && index<newStatus.length()) newStatus[index] = true;
-    }
-    for(int i=0;i<newStatus.length();i++)
-      xsh->getColumn(i)->setPreviewVisible(newStatus[i]);
-
-    err = QScriptValue();
-    QScriptValue newLevel = create(new Level());
-    RenderEngine renderEngine(scene->getToonzScene());
-    for(int row=0;row<scene->getToonzScene()->getFrameCount();row++)
-    {
-      engine()->collectGarbage();
-      TImageP img = renderEngine.renderFrame(row);
-      if(img)
-      {
-        QScriptValue frame = create(new Image(img));
-        QScriptValueList args; args << QString::number(row+1) << frame;
-        newLevel.property("setFrame").call(newLevel, args);
-      }
-      else
-      {
-        err = context()->throwError(tr("Render failed"));
-        break;
-      }
-    }
-
-    for(int i=0;i<oldStatus.length();i++)
-      xsh->getColumn(i)->setPreviewVisible(oldStatus[i]);
-    if(err.isError()) return err;
-    else return newLevel;
-  }
-  */
-
-void Renderer::dumpCache() {
-  TImageCache::instance()->outputMap(0, "C:\\Users\\gmt\\PLI\\cache.log");
-}
+void Renderer::dumpCache() {}
 
 }  // namespace TScriptBinding
