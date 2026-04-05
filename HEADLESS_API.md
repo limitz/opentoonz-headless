@@ -673,7 +673,7 @@ var fx = new Effect("STD_particlesFx");
 
 // Configure particle system
 fx.setParam("birth_rate", 20);
-fx.setParam("lifetime", 50);
+fx.setParam("lifetime", [20, 100]);       // range: [min, max]
 fx.setParam("length", 100);
 fx.setParam("height", 100);
 
@@ -747,7 +747,7 @@ img.save("/tmp/plastic_deform.png");
 
 10. **Save format determined by extension.** `.pli` = vector, `.tlv` = toonz raster, `.png`/`.tif` = full color raster.
 
-11. **Fillable regions require multiple strokes.** A single closed stroke (`stroke.close()`) does **not** create a fillable region. OpenToonz computes regions from intersections between separate strokes. To create a fillable shape, draw it as multiple strokes sharing endpoints:
+11. **Fillable regions require multiple strokes** (or use `addFilledRect`/`addFilledCircle`/`addFilledPolygon`/`addFilledEllipse` which handle this automatically). A single closed stroke (`stroke.close()`) does **not** create a fillable region. OpenToonz computes regions from intersections between separate strokes. To create a fillable shape manually, draw it as multiple strokes sharing endpoints:
 
     ```javascript
     // WRONG — single self-loop, fill() will fail (0 regions)
