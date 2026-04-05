@@ -91,6 +91,231 @@ QScriptValue Palette::addPage(const QString &name) {
   return context()->thisObject();
 }
 
+QScriptValue Palette::addStyle(int tagId) {
+  TColorStyle *style = TColorStyle::create(tagId);
+  if (!style) {
+    return context()->throwError(
+        tr("Unknown style tag ID %1. Use getAvailableTags() to list valid IDs.")
+            .arg(tagId));
+  }
+
+  if (m_palette->getPageCount() == 0) {
+    m_palette->addPage(L"colors");
+  }
+
+  int styleId = m_palette->addStyle(style);
+  TPalette::Page *page = m_palette->getPage(m_palette->getPageCount() - 1);
+  page->addStyle(styleId);
+
+  return QScriptValue(styleId);
+}
+
+QScriptValue Palette::getStyleType(int styleIdx) {
+  if (styleIdx < 0 || styleIdx >= m_palette->getStyleCount()) {
+    return context()->throwError(
+        tr("Style index %1 out of range").arg(styleIdx));
+  }
+  TColorStyle *style = m_palette->getStyle(styleIdx);
+  if (!style) return context()->throwError(tr("Style is null"));
+
+  QScriptValue obj = engine()->newObject();
+  obj.setProperty("tagId", style->getTagId());
+  obj.setProperty("description",
+                  style->getDescription());
+  obj.setProperty("isRegionStyle", style->isRegionStyle());
+  obj.setProperty("isStrokeStyle", style->isStrokeStyle());
+  return obj;
+}
+
+QScriptValue Palette::getStyleParamCount(int styleIdx) {
+  if (styleIdx < 0 || styleIdx >= m_palette->getStyleCount()) {
+    return context()->throwError(
+        tr("Style index %1 out of range").arg(styleIdx));
+  }
+  TColorStyle *style = m_palette->getStyle(styleIdx);
+  if (!style) return context()->throwError(tr("Style is null"));
+  return QScriptValue(style->getParamCount());
+}
+
+QScriptValue Palette::getStyleParamNames(int styleIdx) {
+  if (styleIdx < 0 || styleIdx >= m_palette->getStyleCount()) {
+    return context()->throwError(
+        tr("Style index %1 out of range").arg(styleIdx));
+  }
+  TColorStyle *style = m_palette->getStyle(styleIdx);
+  if (!style) return context()->throwError(tr("Style is null"));
+
+  int count = style->getParamCount();
+  QScriptValue arr = engine()->newArray(count);
+  for (int i = 0; i < count; i++) {
+    QScriptValue param = engine()->newObject();
+    param.setProperty("name", style->getParamNames(i));
+    int ptype = style->getParamType(i);
+    QString typeStr;
+    switch (ptype) {
+    case TColorStyle::BOOL: typeStr = "bool"; break;
+    case TColorStyle::INT: typeStr = "int"; break;
+    case TColorStyle::ENUM: typeStr = "enum"; break;
+    case TColorStyle::DOUBLE: typeStr = "double"; break;
+    case TColorStyle::FILEPATH: typeStr = "filepath"; break;
+    default: typeStr = "unknown"; break;
+    }
+    param.setProperty("type", typeStr);
+    arr.setProperty(i, param);
+  }
+  return arr;
+}
+
+QScriptValue Palette::setStyleParam(int styleIdx, int paramIdx,
+                                    const QScriptValue &value) {
+  if (styleIdx < 0 || styleIdx >= m_palette->getStyleCount()) {
+    return context()->throwError(
+        tr("Style index %1 out of range").arg(styleIdx));
+  }
+  TColorStyle *style = m_palette->getStyle(styleIdx);
+  if (!style) return context()->throwError(tr("Style is null"));
+
+  if (paramIdx < 0 || paramIdx >= style->getParamCount()) {
+    return context()->throwError(
+        tr("Param index %1 out of range [0, %2)")
+            .arg(paramIdx)
+            .arg(style->getParamCount()));
+  }
+
+  TColorStyle::ParamType ptype = style->getParamType(paramIdx);
+  switch (ptype) {
+  case TColorStyle::BOOL:
+    style->setParamValue(paramIdx, value.toBool());
+    break;
+  case TColorStyle::INT:
+  case TColorStyle::ENUM:
+    style->setParamValue(paramIdx, value.toInt32());
+    break;
+  case TColorStyle::DOUBLE:
+    style->setParamValue(paramIdx, value.toNumber());
+    break;
+  case TColorStyle::FILEPATH:
+    style->setParamValue(paramIdx,
+                         TFilePath(value.toString().toStdWString()));
+    break;
+  default:
+    return context()->throwError(tr("Unknown param type"));
+  }
+
+  style->invalidateIcon();
+  return context()->thisObject();
+}
+
+QScriptValue Palette::getStyleParam(int styleIdx, int paramIdx) {
+  if (styleIdx < 0 || styleIdx >= m_palette->getStyleCount()) {
+    return context()->throwError(
+        tr("Style index %1 out of range").arg(styleIdx));
+  }
+  TColorStyle *style = m_palette->getStyle(styleIdx);
+  if (!style) return context()->throwError(tr("Style is null"));
+
+  if (paramIdx < 0 || paramIdx >= style->getParamCount()) {
+    return context()->throwError(
+        tr("Param index %1 out of range [0, %2)")
+            .arg(paramIdx)
+            .arg(style->getParamCount()));
+  }
+
+  TColorStyle::ParamType ptype = style->getParamType(paramIdx);
+  switch (ptype) {
+  case TColorStyle::BOOL:
+    return QScriptValue(style->getParamValue(TColorStyle::bool_tag(), paramIdx));
+  case TColorStyle::INT:
+  case TColorStyle::ENUM:
+    return QScriptValue(style->getParamValue(TColorStyle::int_tag(), paramIdx));
+  case TColorStyle::DOUBLE:
+    return QScriptValue(
+        style->getParamValue(TColorStyle::double_tag(), paramIdx));
+  case TColorStyle::FILEPATH:
+    return QScriptValue(QString::fromStdWString(
+        style->getParamValue(TColorStyle::TFilePath_tag(), paramIdx)
+            .getWideString()));
+  default:
+    return context()->throwError(tr("Unknown param type"));
+  }
+}
+
+QScriptValue Palette::getStyleColorParamCount(int styleIdx) {
+  if (styleIdx < 0 || styleIdx >= m_palette->getStyleCount()) {
+    return context()->throwError(
+        tr("Style index %1 out of range").arg(styleIdx));
+  }
+  TColorStyle *style = m_palette->getStyle(styleIdx);
+  if (!style) return context()->throwError(tr("Style is null"));
+  return QScriptValue(style->getColorParamCount());
+}
+
+QScriptValue Palette::setStyleColorParam(int styleIdx, int colorIdx, int r,
+                                         int g, int b, int a) {
+  if (styleIdx < 0 || styleIdx >= m_palette->getStyleCount()) {
+    return context()->throwError(
+        tr("Style index %1 out of range").arg(styleIdx));
+  }
+  TColorStyle *style = m_palette->getStyle(styleIdx);
+  if (!style) return context()->throwError(tr("Style is null"));
+
+  if (colorIdx < 0 || colorIdx >= style->getColorParamCount()) {
+    return context()->throwError(
+        tr("Color param index %1 out of range [0, %2)")
+            .arg(colorIdx)
+            .arg(style->getColorParamCount()));
+  }
+
+  style->setColorParamValue(colorIdx, TPixel32(r, g, b, a));
+  style->invalidateIcon();
+  return context()->thisObject();
+}
+
+QScriptValue Palette::getStyleColorParam(int styleIdx, int colorIdx) {
+  if (styleIdx < 0 || styleIdx >= m_palette->getStyleCount()) {
+    return context()->throwError(
+        tr("Style index %1 out of range").arg(styleIdx));
+  }
+  TColorStyle *style = m_palette->getStyle(styleIdx);
+  if (!style) return context()->throwError(tr("Style is null"));
+
+  if (colorIdx < 0 || colorIdx >= style->getColorParamCount()) {
+    return context()->throwError(
+        tr("Color param index %1 out of range [0, %2)")
+            .arg(colorIdx)
+            .arg(style->getColorParamCount()));
+  }
+
+  TPixel32 color = style->getColorParamValue(colorIdx);
+  QScriptValue obj = engine()->newObject();
+  obj.setProperty("r", color.r);
+  obj.setProperty("g", color.g);
+  obj.setProperty("b", color.b);
+  obj.setProperty("a", color.m);
+  return obj;
+}
+
+QScriptValue Palette::getAvailableTags() {
+  std::vector<int> tags;
+  TColorStyle::getAllTags(tags);
+  QScriptValue arr = engine()->newArray(tags.size());
+  for (int i = 0; i < (int)tags.size(); i++) {
+    TColorStyle *style = TColorStyle::create(tags[i]);
+    QScriptValue entry = engine()->newObject();
+    entry.setProperty("tagId", tags[i]);
+    if (style) {
+      entry.setProperty("description", style->getDescription());
+      entry.setProperty("isRegionStyle", style->isRegionStyle());
+      entry.setProperty("isStrokeStyle", style->isStrokeStyle());
+      entry.setProperty("paramCount", style->getParamCount());
+      entry.setProperty("colorParamCount", style->getColorParamCount());
+      delete style;
+    }
+    arr.setProperty(i, entry);
+  }
+  return arr;
+}
+
 int Palette::getStyleCount() const { return m_palette->getStyleCount(); }
 
 int Palette::getPageCount() const { return m_palette->getPageCount(); }
