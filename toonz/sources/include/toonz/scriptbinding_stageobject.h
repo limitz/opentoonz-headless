@@ -37,6 +37,10 @@ public:
   // Motion path
   Q_INVOKABLE QScriptValue setSpline(int splineIdx);
 
+  // Inverse kinematics
+  Q_INVOKABLE QScriptValue solveIK(double targetX, double targetY,
+                                   double frame);
+
   // Properties
   Q_PROPERTY(QString name READ getName WRITE setName)
   QString getName() const;

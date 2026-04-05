@@ -42,6 +42,11 @@ public:
   Q_INVOKABLE QScriptValue getStyleColorParam(int styleIdx, int colorIdx);
   Q_INVOKABLE QScriptValue getAvailableTags();
 
+  // Color model (reference image)
+  Q_INVOKABLE QScriptValue loadColorModel(const QScriptValue &pathArg);
+  Q_INVOKABLE QScriptValue pickColorFromModel(int x, int y);
+  Q_INVOKABLE QScriptValue removeColorModel();
+
   // Page management
   Q_INVOKABLE QScriptValue addPage(const QString &name);
 

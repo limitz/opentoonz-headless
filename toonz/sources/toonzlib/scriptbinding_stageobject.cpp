@@ -3,6 +3,7 @@
 #include "toonz/scriptbinding_stageobject.h"
 #include "toonz/tstageobjectspline.h"
 #include "toonz/tstageobjecttree.h"
+#include "toonz/ikengine.h"
 #include "tdoublekeyframe.h"
 
 namespace TScriptBinding {
@@ -142,6 +143,75 @@ QScriptValue StageObject::setSpline(int splineIdx) {
   TStageObjectSpline *spline = tree->getSpline(splineIdx);
   m_obj->setSpline(spline);
   return context()->thisObject();
+}
+
+QScriptValue StageObject::solveIK(double targetX, double targetY,
+                                  double frame) {
+  if (!m_obj) return context()->throwError(tr("StageObject is null"));
+  if (!m_tree) return context()->throwError(tr("StageObject has no tree reference"));
+  if (frame < 0)
+    return context()->throwError(tr("Frame must be >= 0"));
+
+  // Walk the parent chain from this object up to root, collecting the chain
+  std::vector<TStageObject *> chain;
+  TStageObject *cur = m_obj;
+  while (cur) {
+    chain.push_back(cur);
+    TStageObjectId parentId = cur->getParent();
+    if (!parentId.isColumn() && !parentId.isTable()) break;
+    TStageObject *parent = m_tree->getStageObject(parentId, false);
+    if (!parent || parent == cur) break;
+    cur = parent;
+  }
+
+  if (chain.size() < 2) {
+    return context()->throwError(
+        tr("IK needs at least 2 objects in parent chain"));
+  }
+
+  // Reverse so chain goes root -> ... -> this object
+  std::reverse(chain.begin(), chain.end());
+
+  // Build IK engine from chain positions at current frame
+  IKEngine ik;
+  TPointD rootPos = chain[0]->getCenter(frame);
+  ik.setRoot(rootPos);
+
+  // Store initial angles for computing deltas later
+  std::vector<double> initialAngles;
+  initialAngles.push_back(
+      chain[0]->getParam(TStageObject::T_Angle)->getValue(frame));
+
+  for (int i = 1; i < (int)chain.size(); i++) {
+    TPointD pos = chain[i]->getCenter(frame);
+    ik.addJoint(pos, i - 1);
+    initialAngles.push_back(
+        chain[i]->getParam(TStageObject::T_Angle)->getValue(frame));
+  }
+
+  // Solve: drag the last joint to the target
+  TPointD target(targetX, targetY);
+  ik.drag(target);
+
+  // Extract solved angles and apply as keyframes
+  // IKEngine returns absolute geometric angles; we compute deltas
+  // relative to initial angles and apply them
+  QScriptValue result = engine()->newArray();
+  for (int i = 0; i < (int)chain.size() - 1; i++) {
+    double solvedAngle = ik.getJointAngle(i) * (180.0 / M_PI);
+    double delta       = solvedAngle - initialAngles[i];
+    double newAngle    = initialAngles[i + 1] + delta;
+
+    TDoubleParam *param =
+        chain[i + 1]->getParam(TStageObject::T_Angle);
+    TDoubleKeyframe kf(frame, newAngle);
+    kf.m_type = TDoubleKeyframe::Linear;
+    param->setKeyframe(kf);
+
+    result.setProperty(i, newAngle);
+  }
+
+  return result;
 }
 
 QScriptValue StageObject::setParent(const QScriptValue &parentArg) {
