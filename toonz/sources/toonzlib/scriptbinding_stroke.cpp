@@ -102,12 +102,53 @@ TStroke *Stroke::getStroke() {
   return m_stroke;
 }
 
+QScriptValue Stroke::setCapStyle(const QString &style) {
+  QString s = style.toLower();
+  if (s == "butt")
+    m_outlineOptions.m_capStyle = TStroke::OutlineOptions::BUTT_CAP;
+  else if (s == "round")
+    m_outlineOptions.m_capStyle = TStroke::OutlineOptions::ROUND_CAP;
+  else if (s == "projecting")
+    m_outlineOptions.m_capStyle = TStroke::OutlineOptions::PROJECTING_CAP;
+  else
+    return context()->throwError(
+        tr("Unknown cap style '%1'. Valid: butt, round, projecting")
+            .arg(style));
+  if (m_stroke) m_stroke->outlineOptions() = m_outlineOptions;
+  return context()->thisObject();
+}
+
+QScriptValue Stroke::setJoinStyle(const QString &style) {
+  QString s = style.toLower();
+  if (s == "miter")
+    m_outlineOptions.m_joinStyle = TStroke::OutlineOptions::MITER_JOIN;
+  else if (s == "round")
+    m_outlineOptions.m_joinStyle = TStroke::OutlineOptions::ROUND_JOIN;
+  else if (s == "bevel")
+    m_outlineOptions.m_joinStyle = TStroke::OutlineOptions::BEVEL_JOIN;
+  else
+    return context()->throwError(
+        tr("Unknown join style '%1'. Valid: miter, round, bevel")
+            .arg(style));
+  if (m_stroke) m_stroke->outlineOptions() = m_outlineOptions;
+  return context()->thisObject();
+}
+
+QScriptValue Stroke::setMiterLimit(double limit) {
+  if (limit < 0)
+    return context()->throwError(tr("Miter limit must be >= 0"));
+  m_outlineOptions.m_miterUpper = limit;
+  if (m_stroke) m_stroke->outlineOptions() = m_outlineOptions;
+  return context()->thisObject();
+}
+
 void Stroke::ensureBuilt() {
   if (m_stroke) return;
   if (m_points.empty()) return;
   m_stroke = new TStroke(m_points);
   m_stroke->addRef();
   m_stroke->setStyle(m_styleId);
+  m_stroke->outlineOptions() = m_outlineOptions;
   m_points.clear();
 }
 

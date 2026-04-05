@@ -596,6 +596,148 @@ def test_effect_params():
 
 
 # ============================================================
+#  STROKE STYLING
+# ============================================================
+
+def test_stroke_styling():
+    G = "Stroke Styling"
+
+    outpath = os.path.join(TESTDIR, "test_stroke_cap_butt.png")
+    test("Stroke with butt cap", [
+        f'''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var p = new Palette(); var ink = p.addColor(0, 0, 0, 255);
+        var lv = scene.newLevel("Vector", "cap");
+        var vi = new VectorImage();
+        var s = new Stroke(); s.addPoints([[-40,0,8],[40,0,8]]); s.build();
+        s.setCapStyle("butt"); s.setStyle(ink); vi.addStroke(s); vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var renderer = new Renderer();
+        var img = renderer.renderFrame(scene, 0);
+        img.save("{outpath}");
+        print("ok " + img.width + "x" + img.height)''',
+    ], lambda r: (file_exists_and_nonzero(outpath), f"out={output_of(r)}"), group=G)
+
+    outpath2 = os.path.join(TESTDIR, "test_stroke_join_bevel.png")
+    test("Stroke with bevel join", [
+        f'''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var p = new Palette(); var ink = p.addColor(0, 0, 0, 255);
+        var lv = scene.newLevel("Vector", "join");
+        var vi = new VectorImage();
+        var s = new Stroke();
+        s.addPoints([[-40,-20,6],[0,20,6],[40,-20,6]]);
+        s.build(); s.setJoinStyle("bevel"); s.setCapStyle("butt");
+        s.setStyle(ink); vi.addStroke(s); vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var renderer = new Renderer();
+        var img = renderer.renderFrame(scene, 0);
+        img.save("{outpath2}");
+        print("ok " + img.width + "x" + img.height)''',
+    ], lambda r: (file_exists_and_nonzero(outpath2), f"out={output_of(r)}"), group=G)
+
+    test("setCapStyle invalid (expect error)", [
+        '''var s = new Stroke(); s.addPoints([[0,0,2],[10,0,2]]); s.build();
+        try { s.setCapStyle("invalid"); print("no_error"); } catch(e) { print("error"); }''',
+    ], lambda r: (output_of(r) == "error", f"out={output_of(r)}"), group=G)
+
+
+# ============================================================
+#  KEYFRAME OPERATIONS
+# ============================================================
+
+def test_keyframe_ops():
+    G = "Keyframe Operations"
+
+    test("deleteKeyframe removes a keyframe", [
+        '''var scene = new Scene();
+        scene.newLevel("Vector", "kfdel");
+        var obj = scene.getStageObject(0);
+        obj.setKeyframe(0, "x", 10);
+        obj.setKeyframe(5, "x", 50);
+        obj.setKeyframe(10, "x", 100);
+        var before = obj.getKeyframeCount("x");
+        obj.deleteKeyframe(5, "x");
+        var after = obj.getKeyframeCount("x");
+        print("before=" + before + " after=" + after)''',
+    ], lambda r: (output_of(r) == "before=3 after=2", f"out={output_of(r)}"), group=G)
+
+    test("getKeyframes returns frame/value/type objects", [
+        '''var scene = new Scene();
+        scene.newLevel("Vector", "kflist");
+        var obj = scene.getStageObject(0);
+        obj.setKeyframe(0, "y", 0);
+        obj.setKeyframe(12, "y", 100);
+        obj.setInterpolation(0, "y", "easeInOut");
+        var kfs = obj.getKeyframes("y");
+        var out = [];
+        for (var i = 0; i < kfs.length; i++) {
+            out.push("f" + kfs[i].frame + "=" + kfs[i].value + "(" + kfs[i].type + ")");
+        }
+        print(out.join(", "))''',
+    ], lambda r: ("f0=0" in output_of(r) and "f12=100" in output_of(r),
+                  f"out={output_of(r)}"), group=G)
+
+    test("getKeyframeCount on channel with no keyframes", [
+        '''var scene = new Scene();
+        scene.newLevel("Vector", "kfempty");
+        var obj = scene.getStageObject(0);
+        print("count=" + obj.getKeyframeCount("angle"))''',
+    ], lambda r: ("count=0" in output_of(r), f"out={output_of(r)}"), group=G)
+
+
+# ============================================================
+#  SCENE OPERATIONS
+# ============================================================
+
+def test_scene_ops():
+    G = "Scene Operations"
+
+    test("removeLevel removes a level from the scene", [
+        '''var scene = new Scene();
+        var lv1 = scene.newLevel("Vector", "keep");
+        var lv2 = scene.newLevel("Vector", "remove_me");
+        var before = scene.getLevels().length;
+        scene.removeLevel("remove_me");
+        var after = scene.getLevels().length;
+        print("before=" + before + " after=" + after)''',
+    ], lambda r: (output_of(r) == "before=2 after=1", f"out={output_of(r)}"), group=G)
+
+    test("removeLevel with nonexistent name (expect error)", [
+        '''var scene = new Scene();
+        try { scene.removeLevel("nope"); print("no_error"); } catch(e) { print("error"); }''',
+    ], lambda r: (output_of(r) == "error", f"out={output_of(r)}"), group=G)
+
+    test("setColumnOpacity / getColumnOpacity", [
+        '''var scene = new Scene();
+        var lv = scene.newLevel("Vector", "optest");
+        var p = new Palette(); var ink = p.addColor(0,0,0,255);
+        var vi = new VectorImage(); vi.addRect(-20,-20,20,20,2,ink); vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        scene.enableColumnOpacity(true);
+        scene.setColumnOpacity(0, 128);
+        print("opacity=" + scene.getColumnOpacity(0))''',
+    ], lambda r: (output_of(r) == "opacity=128", f"out={output_of(r)}"), group=G)
+
+    outpath = os.path.join(TESTDIR, "test_column_opacity.png")
+    test("Column opacity affects render output", [
+        f'''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var p = new Palette(); var ink = p.addColor(0, 0, 0, 255);
+        var lv = scene.newLevel("Vector", "oprender");
+        var vi = new VectorImage(); vi.addRect(-30, -30, 30, 30, 3, ink); vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        scene.enableColumnOpacity(true);
+        scene.setColumnOpacity(0, 100);
+        var renderer = new Renderer();
+        var img = renderer.renderFrame(scene, 0);
+        img.save("{outpath}");
+        print("ok " + img.width + "x" + img.height)''',
+    ], lambda r: (file_exists_and_nonzero(outpath), f"out={output_of(r)}"), group=G)
+
+
+# ============================================================
 #  MAIN
 # ============================================================
 
@@ -614,6 +756,9 @@ if __name__ == "__main__":
     test_renderer_integration()
     test_multi_column()
     test_effect_params()
+    test_stroke_styling()
+    test_keyframe_ops()
+    test_scene_ops()
 
     # Summary
     print("\n" + "=" * 60)

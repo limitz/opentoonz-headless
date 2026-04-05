@@ -58,6 +58,11 @@ s.addPoints([[x,y,t], [x,y,t], ...]);  // Batch add (t = thickness, default 1.0)
 s.build();                              // Finalize stroke geometry
 s.close();                              // Make it a closed loop
 s.setStyle(styleId);                    // Assign palette color (integer index)
+
+// Outline options (can set before or after build)
+s.setCapStyle("butt");                  // "butt", "round" (default), "projecting"
+s.setJoinStyle("miter");               // "miter", "round" (default), "bevel"
+s.setMiterLimit(6.0);                  // Upper miter limit (default 4.0)
 ```
 
 **Properties:** `length` (double), `pointCount` (int), `style` (int)
@@ -198,12 +203,18 @@ var level = scene.newLevel("Vector", "level_name");    // "Vector", "ToonzRaster
 var level = scene.loadLevel("name", path);
 var levels = scene.getLevels();
 var level = scene.getLevel("name");
+scene.removeLevel("name");                 // Remove level from scene (or pass Level object)
 
 // XSheet cells
 scene.setCell(row, col, level, frameId);  // Place a frame in the timeline
 scene.getCell(row, col);                   // Returns {level, fid}
 scene.insertColumn(col);
 scene.deleteColumn(col);
+
+// Column properties
+scene.enableColumnOpacity(true);           // Must enable before opacity takes effect on render
+scene.setColumnOpacity(col, opacity);      // 0-255
+var opacity = scene.getColumnOpacity(col);
 
 // Stage objects
 var obj = scene.getStageObject(colIdx);    // Get StageObject for column
@@ -289,6 +300,9 @@ var obj = scene.getStageObject(colIdx);   // Cannot create directly
 obj.setKeyframe(frame, channel, value);
 obj.getValueAt(frame, channel);
 obj.setInterpolation(frame, channel, type);
+obj.deleteKeyframe(frame, channel);
+var count = obj.getKeyframeCount(channel);
+var kfs = obj.getKeyframes(channel);       // [{frame, value, type}, ...]
 
 // Hierarchy
 obj.setParent(otherStageObject);

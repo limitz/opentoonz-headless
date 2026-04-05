@@ -329,6 +329,55 @@ QScriptValue Scene::setFrameRate(double fps) {
   return context()->thisObject();
 }
 
+QScriptValue Scene::removeLevel(const QScriptValue &levelArg) {
+  TXshLevel *xl = nullptr;
+
+  Level *level = qscriptvalue_cast<Level *>(levelArg);
+  if (level && level->getSimpleLevel()) {
+    xl = m_scene->getLevelSet()->getLevel(level->getSimpleLevel()->getName());
+  } else if (levelArg.isString()) {
+    xl = m_scene->getLevelSet()->getLevel(levelArg.toString().toStdWString());
+  } else {
+    return context()->throwError(
+        tr("Expected a Level object or level name string"));
+  }
+
+  if (!xl) {
+    return context()->throwError(tr("Level not found in scene"));
+  }
+
+  m_scene->getLevelSet()->removeLevel(xl, true);
+  return context()->thisObject();
+}
+
+QScriptValue Scene::setColumnOpacity(int col, int opacity) {
+  TXsheet *xsh    = m_scene->getXsheet();
+  TXshColumn *column = xsh->getColumn(col);
+  if (!column) {
+    return context()->throwError(
+        tr("Column %1 does not exist").arg(col));
+  }
+  if (opacity < 0) opacity = 0;
+  if (opacity > 255) opacity = 255;
+  column->setOpacity(static_cast<UCHAR>(opacity));
+  return context()->thisObject();
+}
+
+QScriptValue Scene::getColumnOpacity(int col) {
+  TXsheet *xsh    = m_scene->getXsheet();
+  TXshColumn *column = xsh->getColumn(col);
+  if (!column) {
+    return context()->throwError(
+        tr("Column %1 does not exist").arg(col));
+  }
+  return QScriptValue(static_cast<int>(column->getOpacity()));
+}
+
+QScriptValue Scene::enableColumnOpacity(bool on) {
+  m_scene->getProperties()->enableColumnColorFilterOnRender(on);
+  return context()->thisObject();
+}
+
 QScriptValue Scene::buildMesh(const QScriptValue &imageArg,
                               const QString &levelName) {
   Image *img = qscriptvalue_cast<Image *>(imageArg);

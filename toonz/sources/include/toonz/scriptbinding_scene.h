@@ -42,6 +42,12 @@ public:
                                     const QString &name) const;
   Q_INVOKABLE QScriptValue loadLevel(const QString &name,
                                      const QScriptValue &path) const;
+  Q_INVOKABLE QScriptValue removeLevel(const QScriptValue &levelArg);
+
+  // Column properties
+  Q_INVOKABLE QScriptValue setColumnOpacity(int col, int opacity);
+  Q_INVOKABLE QScriptValue getColumnOpacity(int col);
+  Q_INVOKABLE QScriptValue enableColumnOpacity(bool on);
 
   // Stage object access
   Q_INVOKABLE QScriptValue getStageObject(int colIdx);

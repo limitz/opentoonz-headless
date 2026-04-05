@@ -127,6 +127,62 @@ QScriptValue StageObject::setInterpolation(double frame,
           .arg(channel));
 }
 
+static QString interpolationTypeToString(TDoubleKeyframe::Type type) {
+  switch (type) {
+  case TDoubleKeyframe::Constant: return "constant";
+  case TDoubleKeyframe::Linear: return "linear";
+  case TDoubleKeyframe::SpeedInOut: return "speedInOut";
+  case TDoubleKeyframe::EaseInOut: return "easeInOut";
+  case TDoubleKeyframe::EaseInOutPercentage: return "easeInOutPercentage";
+  case TDoubleKeyframe::Exponential: return "exponential";
+  case TDoubleKeyframe::Expression: return "expression";
+  case TDoubleKeyframe::SimilarShape: return "similarShape";
+  case TDoubleKeyframe::File: return "file";
+  default: return "unknown";
+  }
+}
+
+QScriptValue StageObject::deleteKeyframe(double frame, const QString &channel) {
+  if (!m_obj) return context()->throwError(tr("StageObject is null"));
+
+  TDoubleParam *param = getChannelParam(channel);
+  if (!param)
+    return context()->throwError(tr("Unknown channel '%1'").arg(channel));
+
+  param->deleteKeyframe(frame);
+  return context()->thisObject();
+}
+
+QScriptValue StageObject::getKeyframeCount(const QString &channel) {
+  if (!m_obj) return context()->throwError(tr("StageObject is null"));
+
+  TDoubleParam *param = getChannelParam(channel);
+  if (!param)
+    return context()->throwError(tr("Unknown channel '%1'").arg(channel));
+
+  return QScriptValue(param->getKeyframeCount());
+}
+
+QScriptValue StageObject::getKeyframes(const QString &channel) {
+  if (!m_obj) return context()->throwError(tr("StageObject is null"));
+
+  TDoubleParam *param = getChannelParam(channel);
+  if (!param)
+    return context()->throwError(tr("Unknown channel '%1'").arg(channel));
+
+  int count        = param->getKeyframeCount();
+  QScriptValue arr = engine()->newArray(count);
+  for (int i = 0; i < count; i++) {
+    TDoubleKeyframe kf = param->getKeyframe(i);
+    QScriptValue obj   = engine()->newObject();
+    obj.setProperty("frame", kf.m_frame);
+    obj.setProperty("value", kf.m_value);
+    obj.setProperty("type", interpolationTypeToString(kf.m_type));
+    arr.setProperty(i, obj);
+  }
+  return arr;
+}
+
 QScriptValue StageObject::setPlasticRig(const QScriptValue &rigArg) {
   if (!m_obj) return context()->throwError(tr("StageObject is null"));
 

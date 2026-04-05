@@ -14,6 +14,7 @@ class DVAPI Stroke final : public Wrapper {
   std::vector<TThickPoint> m_points;
   TStroke *m_stroke;
   int m_styleId;
+  TStroke::OutlineOptions m_outlineOptions;
 
 public:
   Stroke();
@@ -32,6 +33,11 @@ public:
 
   // Style
   Q_INVOKABLE QScriptValue setStyle(int styleId);
+
+  // Outline options (cap/join/miter)
+  Q_INVOKABLE QScriptValue setCapStyle(const QString &style);
+  Q_INVOKABLE QScriptValue setJoinStyle(const QString &style);
+  Q_INVOKABLE QScriptValue setMiterLimit(double limit);
 
   // Properties
   Q_PROPERTY(double length READ getLength)
