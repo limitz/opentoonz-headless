@@ -22,6 +22,9 @@
 #include "toonz/tcolumnfxset.h"
 #include "tfx.h"
 #include "toutputproperties.h"
+#include "toonz/tcamera.h"
+#include "toonz/tstageobjectspline.h"
+#include "tstroke.h"
 
 namespace TScriptBinding {
 
@@ -249,12 +252,13 @@ QScriptValue Scene::getStageObject(int colIdx) {
   }
   TXsheet *xsh = m_scene->getXsheet();
   TStageObjectId id = TStageObjectId::ColumnId(colIdx);
-  TStageObject *obj = xsh->getStageObjectTree()->getStageObject(id, true);
+  TStageObjectTree *tree = xsh->getStageObjectTree();
+  TStageObject *obj      = tree->getStageObject(id, true);
   if (!obj) {
     return context()->throwError(
         tr("Cannot get stage object for column %1").arg(colIdx));
   }
-  return create(new StageObject(obj));
+  return create(new StageObject(obj, tree));
 }
 
 QScriptValue Scene::connectEffect(int colIdx, const QScriptValue &effectArg) {
@@ -315,6 +319,63 @@ QScriptValue Scene::setFrameRate(double fps) {
   }
   m_scene->getProperties()->getOutputProperties()->setFrameRate(fps);
   return context()->thisObject();
+}
+
+QScriptValue Scene::createSpline(const QScriptValue &pointArray) {
+  if (!pointArray.isArray()) {
+    return context()->throwError(tr("Expected an array of [x, y] points"));
+  }
+
+  quint32 len = pointArray.property("length").toUInt32();
+  if (len < 3) {
+    return context()->throwError(
+        tr("Spline needs at least 3 control points"));
+  }
+
+  std::vector<TPointD> points;
+  for (quint32 i = 0; i < len; i++) {
+    QScriptValue pt = pointArray.property(i);
+    if (!pt.isArray() || pt.property("length").toUInt32() < 2) {
+      return context()->throwError(
+          tr("Each point must be [x, y], got %1").arg(pt.toString()));
+    }
+    double x = pt.property(0).toNumber();
+    double y = pt.property(1).toNumber();
+    points.push_back(TPointD(x, y));
+  }
+
+  TStroke *stroke                   = new TStroke(points);
+  TStageObjectSpline *spline        = new TStageObjectSpline();
+  spline->setStroke(stroke);
+
+  TStageObjectTree *tree = m_scene->getXsheet()->getStageObjectTree();
+  tree->assignUniqueSplineId(spline);
+  tree->insertSpline(spline);
+
+  // Return the spline index
+  int idx = tree->getSplineCount() - 1;
+  return QScriptValue(idx);
+}
+
+QScriptValue Scene::setCameraSize(int w, int h) {
+  if (w <= 0 || h <= 0) {
+    return context()->throwError(
+        tr("Camera width and height must be positive"));
+  }
+  TCamera *camera = m_scene->getCurrentCamera();
+  camera->setRes(TDimension(w, h));
+  // Set size in inches to maintain square pixels (at 72 dpi stage convention)
+  camera->setSize(TDimensionD((double)w / 72.0, (double)h / 72.0));
+  return context()->thisObject();
+}
+
+QScriptValue Scene::getCameraSize() {
+  TCamera *camera    = m_scene->getCurrentCamera();
+  TDimension res     = camera->getRes();
+  QScriptValue result = engine()->newObject();
+  result.setProperty("width", res.lx);
+  result.setProperty("height", res.ly);
+  return result;
 }
 
 }  // namespace TScriptBinding

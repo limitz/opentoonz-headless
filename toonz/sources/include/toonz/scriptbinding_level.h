@@ -59,6 +59,11 @@ public:
   Q_INVOKABLE QScriptValue setPalette(const QScriptValue &paletteArg);
   Q_INVOKABLE QScriptValue getPalette();
 
+  // Drawing hooks (attachment points for cut-out animation)
+  Q_INVOKABLE QScriptValue addHook(const QScriptValue &fid, double x, double y);
+  Q_INVOKABLE QScriptValue getHooks(const QScriptValue &fid);
+  Q_INVOKABLE QScriptValue removeHook(int hookIdx);
+
   // Internal helper methods
   void getFrameIds(QList<TFrameId> &fids);
   TImageP getImg(const TFrameId &fid);

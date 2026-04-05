@@ -53,6 +53,13 @@ public:
   // Frame rate
   Q_INVOKABLE QScriptValue setFrameRate(double fps);
 
+  // Camera
+  Q_INVOKABLE QScriptValue setCameraSize(int w, int h);
+  Q_INVOKABLE QScriptValue getCameraSize();
+
+  // Motion path splines
+  Q_INVOKABLE QScriptValue createSpline(const QScriptValue &pointArray);
+
   ToonzScene *getToonzScene() const { return m_scene; }
 };
 

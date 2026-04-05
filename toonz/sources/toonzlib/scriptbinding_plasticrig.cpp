@@ -10,6 +10,9 @@ PlasticRig::PlasticRig()
     : m_skeleton(new PlasticSkeleton())
     , m_deformation(new PlasticSkeletonDeformation()) {
   m_deformation->addRef();
+  // Attach skeleton to deformation so that addVertex() automatically
+  // creates vertex deformation entries (SkVD) for keyframe animation.
+  m_deformation->attach(0, m_skeleton);
 }
 
 PlasticRig::~PlasticRig() {

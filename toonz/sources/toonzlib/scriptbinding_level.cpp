@@ -14,6 +14,7 @@
 #include "toonz/toonzscene.h"
 #include "toonz/txshsimplelevel.h"
 #include "toonz/levelset.h"
+#include "toonz/hook.h"
 
 // TnzCore / TnzBase includes
 #include "tlevel_io.h"
@@ -504,6 +505,77 @@ QScriptValue Level::getPalette() {
   TPalette *pal = m_sl->getPalette();
   if (!pal) return QScriptValue();
   return create(new Palette(pal));
+}
+
+QScriptValue Level::addHook(const QScriptValue &fidArg, double x, double y) {
+  if (!m_sl) return context()->throwError(tr("Level is empty"));
+
+  QString err;
+  TFrameId fid = getFid(fidArg, err);
+  if (!err.isEmpty()) return context()->throwError(err);
+
+  HookSet *hookSet = m_sl->getHookSet();
+  Hook *hook       = hookSet->addHook();
+  if (!hook) {
+    return context()->throwError(tr("Maximum number of hooks reached (%1)")
+                                     .arg(HookSet::maxHooksCount));
+  }
+
+  hook->setAPos(fid, TPointD(x, y));
+
+  // Return the hook index (1-based, matching OpenToonz convention)
+  int hookIdx = hookSet->getHookCount() - 1;
+  // Find actual index
+  for (int i = 0; i < hookSet->getHookCount(); i++) {
+    if (hookSet->getHook(i) == hook) {
+      hookIdx = i;
+      break;
+    }
+  }
+  return QScriptValue(hookIdx);
+}
+
+QScriptValue Level::getHooks(const QScriptValue &fidArg) {
+  if (!m_sl) return context()->throwError(tr("Level is empty"));
+
+  QString err;
+  TFrameId fid = getFid(fidArg, err);
+  if (!err.isEmpty()) return context()->throwError(err);
+
+  HookSet *hookSet    = m_sl->getHookSet();
+  QScriptValue result = engine()->newArray();
+  quint32 idx         = 0;
+
+  for (int i = 0; i < hookSet->getHookCount(); i++) {
+    Hook *hook = hookSet->getHook(i);
+    if (!hook || hook->isEmpty()) continue;
+
+    TPointD pos       = hook->getAPos(fid);
+    QScriptValue item = engine()->newObject();
+    item.setProperty("index", i);
+    item.setProperty("x", pos.x);
+    item.setProperty("y", pos.y);
+    result.setProperty(idx++, item);
+  }
+  return result;
+}
+
+QScriptValue Level::removeHook(int hookIdx) {
+  if (!m_sl) return context()->throwError(tr("Level is empty"));
+
+  HookSet *hookSet = m_sl->getHookSet();
+  if (hookIdx < 0 || hookIdx >= hookSet->getHookCount()) {
+    return context()->throwError(
+        tr("Hook index %1 out of range").arg(hookIdx));
+  }
+
+  Hook *hook = hookSet->getHook(hookIdx);
+  if (!hook) {
+    return context()->throwError(tr("No hook at index %1").arg(hookIdx));
+  }
+
+  hookSet->clearHook(hook);
+  return context()->thisObject();
 }
 
 }  // namespace TScriptBinding
