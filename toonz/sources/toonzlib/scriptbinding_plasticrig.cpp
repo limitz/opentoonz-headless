@@ -3,6 +3,7 @@
 #include "toonz/scriptbinding_plasticrig.h"
 #include "ext/plasticskeleton.h"
 #include "ext/plasticskeletondeformation.h"
+#include "tdoublekeyframe.h"
 
 namespace TScriptBinding {
 
@@ -13,11 +14,20 @@ PlasticRig::PlasticRig()
   // Attach skeleton to deformation so that addVertex() automatically
   // creates vertex deformation entries (SkVD) for keyframe animation.
   m_deformation->attach(0, m_skeleton);
+  // The default skeleton ID param is 1.0 (for GUI multi-skeleton support).
+  // Set it to 0 so the renderer finds our skeleton at ID 0.
+  TDoubleKeyframe kf(0, 0.0);
+  kf.m_type = TDoubleKeyframe::Constant;
+  m_deformation->skeletonIdsParam()->setKeyframe(kf);
 }
 
 PlasticRig::~PlasticRig() {
-  delete m_skeleton;
-  if (m_deformation) m_deformation->release();
+  // Don't delete m_skeleton directly — the deformation holds a smart pointer
+  // to it via attach(). Detaching releases the smart pointer's reference.
+  if (m_deformation) {
+    m_deformation->detach(0);
+    m_deformation->release();
+  }
 }
 
 QScriptValue PlasticRig::toString() {

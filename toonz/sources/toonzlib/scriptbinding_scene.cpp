@@ -5,10 +5,18 @@
 #include "toonz/scriptbinding_files.h"
 #include "toonz/scriptbinding_stageobject.h"
 #include "toonz/scriptbinding_effect.h"
+#include "toonz/scriptbinding_image.h"
 #include "toonz/txshleveltypes.h"
+#include "toonz/levelproperties.h"
+#include "toonz/txshsimplelevel.h"
 
 #include "tsystem.h"
 #include "tfiletype.h"
+#include "trasterimage.h"
+#include "ttoonzimage.h"
+#include "tmeshimage.h"
+#include "ext/meshbuilder.h"
+#include "ext/meshutils.h"
 
 #include "toonz/tproject.h"
 #include "toonz/toonzscene.h"
@@ -319,6 +327,77 @@ QScriptValue Scene::setFrameRate(double fps) {
   }
   m_scene->getProperties()->getOutputProperties()->setFrameRate(fps);
   return context()->thisObject();
+}
+
+QScriptValue Scene::buildMesh(const QScriptValue &imageArg,
+                              const QString &levelName) {
+  Image *img = qscriptvalue_cast<Image *>(imageArg);
+  if (!img || !img->getImg()) {
+    return context()->throwError(tr("Expected an Image argument"));
+  }
+
+  // Extract raster from Raster or ToonzRaster image
+  TRasterP ras;
+  double dpix = 72.0, dpiy = 72.0;
+  if (TRasterImageP ri = img->getImg()) {
+    ras = ri->getRaster();
+    ri->getDpi(dpix, dpiy);
+  } else if (TToonzImageP ti = img->getImg()) {
+    ras = ti->getRaster();
+    ti->getDpi(dpix, dpiy);
+  } else {
+    return context()->throwError(
+        tr("buildMesh requires a Raster or ToonzRaster image"));
+  }
+  if (!ras) {
+    return context()->throwError(tr("Image has no raster data"));
+  }
+  if (dpix <= 0) dpix = 72.0;
+  if (dpiy <= 0) dpiy = 72.0;
+
+  if (levelName.isEmpty()) {
+    return context()->throwError(tr("Level name cannot be empty"));
+  }
+  if (m_scene->getLevelSet()->hasLevel(levelName.toStdWString())) {
+    return context()->throwError(
+        tr("Level name '%1' is already used").arg(levelName));
+  }
+
+  // Build mesh from raster
+  MeshBuilderOptions opts;
+  opts.m_margin               = 5;
+  opts.m_targetEdgeLength     = 15.0;
+  opts.m_targetMaxVerticesCount = 0;
+  opts.m_transparentColor     = TPixel64::Transparent;
+
+  TMeshImageP meshImg = ::buildMesh(ras, opts);
+  if (!meshImg || meshImg->meshes().empty()) {
+    return context()->throwError(tr("Failed to build mesh from image"));
+  }
+
+  // Center the mesh: buildMesh returns coords with origin at lower-left of
+  // the raster, but OpenToonz expects images centered at the origin.
+  int w = ras->getLx(), h = ras->getLy();
+  transform(meshImg, TTranslation(-w * 0.5, -h * 0.5));
+
+  // Create mesh level
+  TXshLevel *xl =
+      m_scene->createNewLevel(MESH_XSHLEVEL, levelName.toStdWString());
+  TXshSimpleLevel *sl = xl->getSimpleLevel();
+  if (!sl) {
+    return context()->throwError(tr("Failed to create mesh level"));
+  }
+
+  // Set DPI to match source image
+  LevelProperties *lprop = sl->getProperties();
+  lprop->setDpiPolicy(LevelProperties::DP_CustomDpi);
+  lprop->setDpi(TPointD(dpix, dpiy));
+
+  // Store mesh as frame 1
+  sl->setFrame(TFrameId(1), meshImg.getPointer());
+  sl->setDirtyFlag(true);
+
+  return create(engine(), new Level(sl));
 }
 
 QScriptValue Scene::createSpline(const QScriptValue &pointArray) {

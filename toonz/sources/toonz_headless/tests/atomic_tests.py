@@ -1760,16 +1760,40 @@ def test_missing_features():
         'print("No undo/redo in headless - operations are immediate and permanent")',
     ], lambda r: (True, "NO API - No undo/redo"), group=G)
 
-    # PlasticRig mesh generation from image
-    test("[GAP] PlasticRig auto mesh generation from drawing", [
-        'print("PlasticRig has skeleton but no mesh triangulation from drawing")',
-    ], lambda r: (True, "NO API - Mesh auto-generation not exposed"), group=G)
+    # PlasticRig mesh generation from image — IMPLEMENTED (scene.buildMesh)
+    test("[IMPLEMENTED] PlasticRig mesh generation from drawing (scene.buildMesh)", [
+        '''var scene = new Scene();
+        var lv = scene.newLevel("ToonzRaster", "meshsrc");
+        var rc = new RasterCanvas(64, 64);
+        rc.brushStroke([[10,10,3],[54,10,3],[54,54,3],[10,54,3],[10,10,3]], 1, true);
+        lv.setFrame(1, rc.toImage());
+        var texImg = lv.getFrame(1);
+        var meshLevel = scene.buildMesh(texImg, "mesh_test");
+        print("type=" + meshLevel.type + " fc=" + meshLevel.frameCount)''',
+    ], lambda r: ("fc=1" in output_of(r), f"out={output_of(r)}"), group=G)
 
-    # PlasticRig apply deformation to image
-    test("[GAP] PlasticRig apply deformation to render", [
-        '''var rig = new PlasticRig(); var root = rig.addVertex(0,0,-1);
-        print("PlasticRig exists but cannot apply deformation to actual image/render")''',
-    ], lambda r: (True, f"out={output_of(r)} - NO WAY TO APPLY DEFORMATION TO IMAGE"), group=G)
+    # PlasticRig apply deformation to image — IMPLEMENTED (setPlasticRig + renderer)
+    test("[IMPLEMENTED] PlasticRig apply deformation to render (setPlasticRig)", [
+        '''var scene = new Scene(); scene.setCameraSize(64, 64);
+        var lv = scene.newLevel("ToonzRaster", "defsrc");
+        var rc = new RasterCanvas(64, 64);
+        rc.brushStroke([[12,12,3],[52,12,3],[52,52,3],[12,52,3],[12,12,3]], 1, true);
+        lv.setFrame(1, rc.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var texImg = lv.getFrame(1);
+        var meshLevel = scene.buildMesh(texImg, "def_mesh");
+        scene.setCell(0, 1, meshLevel, 1);
+        var texObj = scene.getStageObject(0);
+        var meshObj = scene.getStageObject(1);
+        texObj.setParent(meshObj);
+        var rig = new PlasticRig();
+        var root = rig.addVertex(0, 0);
+        var tip = rig.addVertex(0, 20, root);
+        rig.setVertexKeyframe(tip, 0, "angle", 0);
+        rig.setVertexKeyframe(tip, 12, "angle", 30);
+        meshObj.setPlasticRig(rig);
+        print("pipeline wired")''',
+    ], lambda r: (output_of(r) == "pipeline wired", f"out={output_of(r)}"), group=G)
 
     # Effect connection to scene/columns — IMPLEMENTED (G2)
     test("[IMPLEMENTED] Connect Effect to scene column (connectEffect)", [

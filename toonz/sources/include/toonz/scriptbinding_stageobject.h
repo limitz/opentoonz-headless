@@ -34,6 +34,9 @@ public:
   Q_INVOKABLE QScriptValue setParent(const QScriptValue &parentObj);
   Q_INVOKABLE QScriptValue setStatus(const QString &status);
 
+  // Plastic deformation
+  Q_INVOKABLE QScriptValue setPlasticRig(const QScriptValue &rigArg);
+
   // Motion path
   Q_INVOKABLE QScriptValue setSpline(int splineIdx);
 

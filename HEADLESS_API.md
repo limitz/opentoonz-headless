@@ -215,6 +215,9 @@ scene.connectEffect(colIdx, effect);       // Wire column → effect → xsheet 
 scene.setCameraSize(width, height);        // Set camera resolution in pixels
 var cam = scene.getCameraSize();           // Returns {width, height}
 
+// Mesh generation for plastic deformation
+var meshLevel = scene.buildMesh(rasterImage, "mesh_name");  // Returns Level (MESH type)
+
 // Motion path splines
 var splineIdx = scene.createSpline([[x,y], [x,y], ...]);  // Min 3 control points
 
@@ -291,6 +294,9 @@ obj.setInterpolation(frame, channel, type);
 obj.setParent(otherStageObject);
 obj.setStatus(statusString);              // "xy", "path", "pathAim", "ik"
 
+// Plastic deformation
+obj.setPlasticRig(plasticRig);            // Attach PlasticRig deformation to this column
+
 // Motion path
 obj.setSpline(splineIdx);                 // Assign spline from scene.createSpline()
 
@@ -347,6 +353,15 @@ rig.setVertexKeyframe(vertexIdx, frame, param, value);
 **Properties:** `vertexCount` (int)
 
 **Note:** The skeleton is automatically attached to the deformation system — `addVertex()` creates vertex deformation entries so `setVertexKeyframe()` works immediately.
+
+**Rendering plastic deformation** requires wiring up the full pipeline:
+1. Build a mesh from the texture image: `scene.buildMesh(image, "meshName")`
+2. Place the mesh in a column: `scene.setCell(0, meshCol, meshLevel, 1)`
+3. Parent the texture column to the mesh column: `texObj.setParent(meshObj)`
+4. Attach the rig to the mesh column: `meshObj.setPlasticRig(rig)`
+5. Render — the deformer is injected automatically
+
+See the [Plastic Deformation](#plastic-deformation) example below.
 
 ---
 
@@ -419,8 +434,8 @@ var outputLevel = renderer.renderScene(scene);                // Returns Level w
 
 **Tips:**
 - Set camera size first: `scene.setCameraSize(1920, 1080)` controls output resolution
-- The returned Image may show "Empty" in `toString()` on the same eval due to async timing — access `type`/`width`/`height` in the next eval for correct values
-- Rendering uses the TRenderer thread pool with proper event loop handling
+- Rendering is synchronous — `renderFrame()` and `renderScene()` block until complete and return the finished image in the same eval
+- Rendering uses the TRenderer thread pool with proper cross-thread synchronization
 
 ---
 
@@ -593,9 +608,6 @@ scene.setCell(0, 0, level, 1);
 // 3. Render
 var renderer = new Renderer();
 var img = renderer.renderFrame(scene, 0);
-// Access properties in next eval due to async timing
-```
-```javascript
 img.save("/tmp/rendered_ball.png");
 ```
 
@@ -639,6 +651,43 @@ fx.setParamKeyframe("wind_intensity", 48, 30);
 // List all available parameters
 var names = fx.getParamNames();
 print(names.length + " parameters available");
+```
+
+### Plastic Deformation
+
+```javascript
+var scene = new Scene();
+scene.setCameraSize(256, 256);
+
+// 1. Create texture (a rectangle outline)
+var texLevel = scene.newLevel("ToonzRaster", "texture");
+var canvas = new RasterCanvas(256, 256);
+canvas.brushStroke([[78,28,3],[178,28,3],[178,228,3],[78,228,3],[78,28,3]], 1, true);
+texLevel.setFrame(1, canvas.toImage());
+scene.setCell(0, 0, texLevel, 1);
+
+// 2. Build mesh from texture
+var texImg = texLevel.getFrame(1);
+var meshLevel = scene.buildMesh(texImg, "mesh1");
+scene.setCell(0, 1, meshLevel, 1);
+
+// 3. Parent texture column to mesh column
+var texObj  = scene.getStageObject(0);
+var meshObj = scene.getStageObject(1);
+texObj.setParent(meshObj);
+
+// 4. Build rig and animate
+var rig = new PlasticRig();
+var root = rig.addVertex(0, 0);
+var tip  = rig.addVertex(0, 80, root);
+rig.setVertexKeyframe(tip, 0, "angle", 0);
+rig.setVertexKeyframe(tip, 24, "angle", 30);
+meshObj.setPlasticRig(rig);
+
+// 5. Render deformed frame
+var renderer = new Renderer();
+var img = renderer.renderFrame(scene, 12);  // mid-animation
+img.save("/tmp/plastic_deform.png");
 ```
 
 ---

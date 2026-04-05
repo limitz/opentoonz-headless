@@ -57,6 +57,10 @@ public:
   Q_INVOKABLE QScriptValue setCameraSize(int w, int h);
   Q_INVOKABLE QScriptValue getCameraSize();
 
+  // Mesh generation for plastic deformation
+  Q_INVOKABLE QScriptValue buildMesh(const QScriptValue &imageArg,
+                                     const QString &levelName);
+
   // Motion path splines
   Q_INVOKABLE QScriptValue createSpline(const QScriptValue &pointArray);
 

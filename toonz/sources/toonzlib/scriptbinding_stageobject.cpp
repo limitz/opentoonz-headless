@@ -1,9 +1,11 @@
 
 
 #include "toonz/scriptbinding_stageobject.h"
+#include "toonz/scriptbinding_plasticrig.h"
 #include "toonz/tstageobjectspline.h"
 #include "toonz/tstageobjecttree.h"
 #include "toonz/ikengine.h"
+#include "ext/plasticskeletondeformation.h"
 #include "tdoublekeyframe.h"
 
 namespace TScriptBinding {
@@ -123,6 +125,24 @@ QScriptValue StageObject::setInterpolation(double frame,
       tr("No keyframe found at frame %1 on channel '%2'")
           .arg(frame)
           .arg(channel));
+}
+
+QScriptValue StageObject::setPlasticRig(const QScriptValue &rigArg) {
+  if (!m_obj) return context()->throwError(tr("StageObject is null"));
+
+  PlasticRig *rig = qscriptvalue_cast<PlasticRig *>(rigArg);
+  if (!rig) {
+    return context()->throwError(tr("Expected a PlasticRig argument"));
+  }
+
+  PlasticSkeletonDeformation *def = rig->getDeformation();
+  if (!def) {
+    return context()->throwError(tr("PlasticRig has no deformation data"));
+  }
+
+  PlasticSkeletonDeformationP sdp(def);
+  m_obj->setPlasticSkeletonDeformation(sdp);
+  return context()->thisObject();
 }
 
 QScriptValue StageObject::setSpline(int splineIdx) {
