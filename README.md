@@ -1,6 +1,6 @@
 # OpenToonz Headless
 
-A headless, programmatically controllable fork of [OpenToonz](https://github.com/opentoonz/opentoonz) — the open-source 2D animation software. Exposes the full animation pipeline via a JSON-RPC interface over stdin/stdout, designed for agentic and automated workflows.
+A headless, programmatically controllable fork of [OpenToonz](https://github.com/opentoonz/opentoonz) — the open-source 2D animation software. Exposes the full animation pipeline via a JSON-RPC interface over stdin/stdout, designed for automated workflows.
 
 ## Headless Interface
 
