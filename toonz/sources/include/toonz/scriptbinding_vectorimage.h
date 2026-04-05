@@ -44,6 +44,20 @@ public:
   // Merging
   Q_INVOKABLE QScriptValue merge(const QScriptValue &otherVi);
 
+  // Geometric primitives (add multiple strokes forming a fillable shape)
+  Q_INVOKABLE QScriptValue addRect(double x1, double y1, double x2, double y2,
+                                   double thickness, int styleId);
+  Q_INVOKABLE QScriptValue addCircle(double cx, double cy, double radius,
+                                     double thickness, int styleId,
+                                     int segments = 16);
+  Q_INVOKABLE QScriptValue addPolygon(double cx, double cy, double radius,
+                                      int sides, double thickness, int styleId);
+  Q_INVOKABLE QScriptValue addEllipse(double cx, double cy, double rx,
+                                      double ry, double thickness, int styleId,
+                                      int segments = 16);
+  Q_INVOKABLE QScriptValue addLine(double x1, double y1, double x2, double y2,
+                                   double thickness, int styleId);
+
   // Palette
   Q_INVOKABLE QScriptValue setPalette(const QScriptValue &paletteArg);
 
