@@ -90,9 +90,18 @@ QScriptValue RasterCanvas::rectFill(int x1, int y1, int x2, int y2,
     return context()->throwError(tr("Canvas not initialized"));
   }
 
+  // Write paint values directly instead of using AreaFiller, which has a
+  // GUI optimization that skips partial-rect fills on blank (pure-paint)
+  // canvases — making rectFill a no-op on freshly cleared rasters.
   TRect rect(x1, y1, x2, y2);
-  AreaFiller filler(m_raster);
-  filler.rectFill(rect, styleId, false, true, true);
+  TRect clipped = rect * m_raster->getBounds();
+  if (clipped.isEmpty()) return context()->thisObject();
+
+  for (int y = clipped.y0; y <= clipped.y1; y++) {
+    TPixelCM32 *pix = m_raster->pixels(y) + clipped.x0;
+    for (int x = clipped.x0; x <= clipped.x1; x++, pix++)
+      *pix = TPixelCM32(pix->getInk(), styleId, pix->getTone());
+  }
   return context()->thisObject();
 }
 

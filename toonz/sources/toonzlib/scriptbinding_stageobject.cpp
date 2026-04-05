@@ -1,13 +1,16 @@
 
 
 #include "toonz/scriptbinding_stageobject.h"
+#include "toonz/tstageobjectspline.h"
+#include "toonz/tstageobjecttree.h"
 #include "tdoublekeyframe.h"
 
 namespace TScriptBinding {
 
-StageObject::StageObject() : m_obj(nullptr) {}
+StageObject::StageObject() : m_obj(nullptr), m_tree(nullptr) {}
 
-StageObject::StageObject(TStageObject *obj) : m_obj(obj) {}
+StageObject::StageObject(TStageObject *obj, TStageObjectTree *tree)
+    : m_obj(obj), m_tree(tree) {}
 
 StageObject::~StageObject() {}
 
@@ -119,6 +122,26 @@ QScriptValue StageObject::setInterpolation(double frame,
       tr("No keyframe found at frame %1 on channel '%2'")
           .arg(frame)
           .arg(channel));
+}
+
+QScriptValue StageObject::setSpline(int splineIdx) {
+  if (!m_obj) return context()->throwError(tr("StageObject is null"));
+
+  TStageObjectTree *tree = m_tree;
+  if (!tree) {
+    return context()->throwError(tr("StageObject has no tree reference"));
+  }
+
+  if (splineIdx < 0 || splineIdx >= tree->getSplineCount()) {
+    return context()->throwError(
+        tr("Spline index %1 out of range [0, %2)")
+            .arg(splineIdx)
+            .arg(tree->getSplineCount()));
+  }
+
+  TStageObjectSpline *spline = tree->getSpline(splineIdx);
+  m_obj->setSpline(spline);
+  return context()->thisObject();
 }
 
 QScriptValue StageObject::setParent(const QScriptValue &parentArg) {

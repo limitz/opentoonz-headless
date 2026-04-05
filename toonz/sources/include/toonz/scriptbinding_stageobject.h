@@ -11,11 +11,12 @@ namespace TScriptBinding {
 class DVAPI StageObject final : public Wrapper {
   Q_OBJECT
 
-  TStageObject *m_obj;  // Not owned — belongs to TXsheet's stage object tree
+  TStageObject *m_obj;           // Not owned — belongs to TXsheet's stage object tree
+  TStageObjectTree *m_tree;      // Not owned — for spline access
 
 public:
   StageObject();
-  explicit StageObject(TStageObject *obj);
+  explicit StageObject(TStageObject *obj, TStageObjectTree *tree = nullptr);
   ~StageObject();
 
   WRAPPER_STD_METHODS(StageObject)
@@ -32,6 +33,9 @@ public:
   // Hierarchy
   Q_INVOKABLE QScriptValue setParent(const QScriptValue &parentObj);
   Q_INVOKABLE QScriptValue setStatus(const QString &status);
+
+  // Motion path
+  Q_INVOKABLE QScriptValue setSpline(int splineIdx);
 
   // Properties
   Q_PROPERTY(QString name READ getName WRITE setName)
