@@ -3,6 +3,7 @@
 
 // Toonz script bindings
 #include "toonz/scriptbinding_files.h"
+#include "toonz/scriptbinding_palette.h"
 
 // TnzLib includes
 #include "toonz/tcenterlinevectorizer.h"
@@ -484,6 +485,25 @@ int Level::setFrame(const TFrameId &fid, const TImageP &img) {
   m_sl->setFrame(fid, img);
   m_sl->setDirtyFlag(true);
   return 1;
+}
+
+QScriptValue Level::setPalette(const QScriptValue &paletteArg) {
+  Palette *pal = qscriptvalue_cast<Palette *>(paletteArg);
+  if (!pal) {
+    return context()->throwError(tr("Expected a Palette object"));
+  }
+  if (!m_sl) {
+    return context()->throwError(tr("Level is empty"));
+  }
+  m_sl->setPalette(pal->getPalette());
+  return context()->thisObject();
+}
+
+QScriptValue Level::getPalette() {
+  if (!m_sl) return context()->throwError(tr("Level is empty"));
+  TPalette *pal = m_sl->getPalette();
+  if (!pal) return QScriptValue();
+  return create(new Palette(pal));
 }
 
 }  // namespace TScriptBinding

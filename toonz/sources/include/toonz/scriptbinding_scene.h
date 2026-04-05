@@ -43,6 +43,12 @@ public:
   Q_INVOKABLE QScriptValue loadLevel(const QString &name,
                                      const QScriptValue &path) const;
 
+  // Stage object access
+  Q_INVOKABLE QScriptValue getStageObject(int colIdx);
+
+  // Frame rate
+  Q_INVOKABLE QScriptValue setFrameRate(double fps);
+
   ToonzScene *getToonzScene() const { return m_scene; }
 };
 

@@ -13,6 +13,14 @@
 #include "toonz/scriptbinding_rasterizer.h"
 #include "toonz/scriptbinding_toonz_raster_converter.h"
 #include "toonz/scriptbinding_image_builder.h"
+#include "toonz/scriptbinding_stroke.h"
+#include "toonz/scriptbinding_vectorimage.h"
+#include "toonz/scriptbinding_rastercanvas.h"
+#include "toonz/scriptbinding_palette.h"
+#include "toonz/scriptbinding_stageobject.h"
+#include "toonz/scriptbinding_inbetween.h"
+#include "toonz/scriptbinding_plasticrig.h"
+#include "toonz/scriptbinding_effect.h"
 #include "toonz/tcenterlinevectorizer.h"
 #include "toonz/tcamera.h"
 #include "toonz/stage.h"
@@ -174,6 +182,14 @@ void bindAll(QScriptEngine &engine) {
   bindClass<ToonzRasterConverter>(engine, "ToonzRasterConverter");
   bindClass<FilePath>(engine, "FilePath");
   bindClass<Renderer>(engine, "Renderer");
+  bindClass<Stroke>(engine, "Stroke");
+  bindClass<VectorImage>(engine, "VectorImage");
+  bindClass<RasterCanvas>(engine, "RasterCanvas");
+  bindClass<Palette>(engine, "Palette");
+  bindClass<StageObject>(engine, "StageObject");
+  bindClass<Inbetween>(engine, "Inbetween");
+  bindClass<PlasticRig>(engine, "PlasticRig");
+  bindClass<Effect>(engine, "Effect");
 
   // Setup any static methods
   setupStaticMethods(engine);

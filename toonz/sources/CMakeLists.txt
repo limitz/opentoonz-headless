@@ -785,6 +785,7 @@ add_subdirectory(toonz)
 add_subdirectory(tcleanupper)
 add_subdirectory(tcomposer)
 add_subdirectory(tconverter)
+add_subdirectory(toonz_headless)
 add_subdirectory(toonzfarm)
 
 if(BUILD_TARGET_WIN)
