@@ -3,6 +3,7 @@
 #include "toonz/scriptbinding_scene.h"
 #include "toonz/scriptbinding_level.h"
 #include "toonz/scriptbinding_files.h"
+#include "toonz/scriptbinding_stageobject.h"
 #include "toonz/txshleveltypes.h"
 
 #include "tsystem.h"
@@ -13,6 +14,9 @@
 #include "toonz/txsheet.h"
 #include "toonz/txshcell.h"
 #include "toonz/levelset.h"
+#include "toonz/tstageobjecttree.h"
+#include "toonz/sceneproperties.h"
+#include "toutputproperties.h"
 
 namespace TScriptBinding {
 
@@ -226,6 +230,25 @@ QScriptValue Scene::insertColumn(int col) {
 
 QScriptValue Scene::deleteColumn(int col) {
   m_scene->getXsheet()->removeColumn(col);
+  return context()->thisObject();
+}
+
+QScriptValue Scene::getStageObject(int colIdx) {
+  TXsheet *xsh = m_scene->getXsheet();
+  TStageObjectId id = TStageObjectId::ColumnId(colIdx);
+  TStageObject *obj = xsh->getStageObjectTree()->getStageObject(id, true);
+  if (!obj) {
+    return context()->throwError(
+        tr("Cannot get stage object for column %1").arg(colIdx));
+  }
+  return create(new StageObject(obj));
+}
+
+QScriptValue Scene::setFrameRate(double fps) {
+  if (fps <= 0) {
+    return context()->throwError(tr("Frame rate must be positive"));
+  }
+  m_scene->getProperties()->getOutputProperties()->setFrameRate(fps);
   return context()->thisObject();
 }
 

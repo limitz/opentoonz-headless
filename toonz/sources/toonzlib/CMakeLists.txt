@@ -15,6 +15,14 @@ set(MOC_HEADERS
     ../include/toonz/scriptbinding_renderer.h
     ../include/toonz/scriptbinding_scene.h
     ../include/toonz/scriptbinding_toonz_raster_converter.h
+    ../include/toonz/scriptbinding_stroke.h
+    ../include/toonz/scriptbinding_vectorimage.h
+    ../include/toonz/scriptbinding_rastercanvas.h
+    ../include/toonz/scriptbinding_palette.h
+    ../include/toonz/scriptbinding_stageobject.h
+    ../include/toonz/scriptbinding_inbetween.h
+    ../include/toonz/scriptbinding_plasticrig.h
+    ../include/toonz/scriptbinding_effect.h
     ../include/toonz/scriptengine.h
     ../include/toonz/stylemanager.h
     ../include/toonz/tcenterlinevectorizer.h
@@ -224,6 +232,14 @@ set(SOURCES
     scriptbinding_renderer.cpp
     scriptbinding_scene.cpp
     scriptbinding_toonz_raster_converter.cpp
+    scriptbinding_stroke.cpp
+    scriptbinding_vectorimage.cpp
+    scriptbinding_rastercanvas.cpp
+    scriptbinding_palette.cpp
+    scriptbinding_stageobject.cpp
+    scriptbinding_inbetween.cpp
+    scriptbinding_plasticrig.cpp
+    scriptbinding_effect.cpp
     scriptengine.cpp
     skeleton.cpp
     skeletonlut.cpp

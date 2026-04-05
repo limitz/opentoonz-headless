@@ -55,6 +55,10 @@ public:
   Q_INVOKABLE QScriptValue load(const QScriptValue &fp);
   Q_INVOKABLE QScriptValue save(const QScriptValue &fp);
 
+  // Palette
+  Q_INVOKABLE QScriptValue setPalette(const QScriptValue &paletteArg);
+  Q_INVOKABLE QScriptValue getPalette();
+
   // Internal helper methods
   void getFrameIds(QList<TFrameId> &fids);
   TImageP getImg(const TFrameId &fid);
