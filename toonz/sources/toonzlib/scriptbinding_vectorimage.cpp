@@ -210,6 +210,44 @@ QScriptValue VectorImage::addPolygon(double cx, double cy, double radius,
   return context()->thisObject();
 }
 
+QScriptValue VectorImage::addFilledRect(double x1, double y1, double x2,
+                                        double y2, double thickness,
+                                        int inkStyleId, int fillStyleId) {
+  addRect(x1, y1, x2, y2, thickness, inkStyleId);
+  m_vi->findRegions();
+  double cx = (x1 + x2) * 0.5, cy = (y1 + y2) * 0.5;
+  m_vi->fill(TPointD(cx, cy), fillStyleId);
+  return context()->thisObject();
+}
+
+QScriptValue VectorImage::addFilledCircle(double cx, double cy, double radius,
+                                          double thickness, int inkStyleId,
+                                          int fillStyleId, int segments) {
+  addCircle(cx, cy, radius, thickness, inkStyleId, segments);
+  m_vi->findRegions();
+  m_vi->fill(TPointD(cx, cy), fillStyleId);
+  return context()->thisObject();
+}
+
+QScriptValue VectorImage::addFilledPolygon(double cx, double cy, double radius,
+                                           int sides, double thickness,
+                                           int inkStyleId, int fillStyleId) {
+  addPolygon(cx, cy, radius, sides, thickness, inkStyleId);
+  m_vi->findRegions();
+  m_vi->fill(TPointD(cx, cy), fillStyleId);
+  return context()->thisObject();
+}
+
+QScriptValue VectorImage::addFilledEllipse(double cx, double cy, double rx,
+                                           double ry, double thickness,
+                                           int inkStyleId, int fillStyleId,
+                                           int segments) {
+  addEllipse(cx, cy, rx, ry, thickness, inkStyleId, segments);
+  m_vi->findRegions();
+  m_vi->fill(TPointD(cx, cy), fillStyleId);
+  return context()->thisObject();
+}
+
 QScriptValue VectorImage::setPalette(const QScriptValue &paletteArg) {
   Palette *pal = nullptr;
   QScriptValue err = checkPalette(context(), paletteArg, pal);

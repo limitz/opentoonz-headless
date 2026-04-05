@@ -94,6 +94,13 @@ vi.addEllipse(cx, cy, rx, ry, thickness, styleId, segments);
 vi.addPolygon(cx, cy, radius, sides, thickness, styleId);
 vi.addLine(x1, y1, x2, y2, thickness, styleId);
 
+// Filled primitives (strokes + auto-fill in one call)
+vi.addFilledRect(x1, y1, x2, y2, thickness, inkStyleId, fillStyleId);
+vi.addFilledCircle(cx, cy, radius, thickness, inkStyleId, fillStyleId, segments);
+vi.addFilledPolygon(cx, cy, radius, sides, thickness, inkStyleId, fillStyleId);
+vi.addFilledEllipse(cx, cy, rx, ry, thickness, inkStyleId, fillStyleId, segments);
+// Use inkStyleId=0 for invisible outlines (filled shape only)
+
 // Fill operations (requires regions formed by closed/intersecting strokes)
 vi.findRegions();                       // Compute regions explicitly before fill
 vi.fill(x, y, styleId);                // Flood fill region at point
@@ -127,7 +134,8 @@ CPU-based raster drawing surface for TZP (Toonz Raster) levels. No GPU required.
 var rc = new RasterCanvas(width, height);  // Create canvas (pixels)
 
 // Drawing
-rc.brushStroke([[x,y,t], ...], styleId, antialias);  // Draw brush stroke
+rc.brushStroke([[x,y,t], ...], styleId, antialias);       // Draw brush stroke
+rc.brushStroke([[x,y,t], ...], styleId, antialias, true); // Lock-alpha: only paint over existing ink
 rc.fill(x, y, styleId);                  // Flood fill at point
 rc.rectFill(x1, y1, x2, y2, styleId);   // Fill rectangle (works on blank canvas)
 rc.inkFill(x, y, styleId, searchRay);    // Fill ink lines at point
@@ -303,6 +311,7 @@ obj.setInterpolation(frame, channel, type);
 obj.deleteKeyframe(frame, channel);
 var count = obj.getKeyframeCount(channel);
 var kfs = obj.getKeyframes(channel);       // [{frame, value, type}, ...]
+obj.setExpression(frame, channel, "frame * 3");  // Expression-driven animation
 
 // Hierarchy
 obj.setParent(otherStageObject);

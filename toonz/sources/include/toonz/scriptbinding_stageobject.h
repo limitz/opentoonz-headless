@@ -32,6 +32,8 @@ public:
   Q_INVOKABLE QScriptValue deleteKeyframe(double frame, const QString &channel);
   Q_INVOKABLE QScriptValue getKeyframeCount(const QString &channel);
   Q_INVOKABLE QScriptValue getKeyframes(const QString &channel);
+  Q_INVOKABLE QScriptValue setExpression(double frame, const QString &channel,
+                                         const QString &expression);
 
   // Hierarchy
   Q_INVOKABLE QScriptValue setParent(const QScriptValue &parentObj);

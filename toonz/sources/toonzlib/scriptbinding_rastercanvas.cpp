@@ -9,6 +9,8 @@
 #include "ttoonzimage.h"
 #include "tpalette.h"
 
+#include <QSet>
+
 namespace TScriptBinding {
 
 RasterCanvas::RasterCanvas() : m_width(0), m_height(0) {}
@@ -40,7 +42,8 @@ QScriptValue RasterCanvas::ctor(QScriptContext *context,
 }
 
 QScriptValue RasterCanvas::brushStroke(const QScriptValue &pointArray,
-                                       int styleId, bool antialias) {
+                                       int styleId, bool antialias,
+                                       bool lockAlpha) {
   if (!m_raster) {
     return context()->throwError(tr("Canvas not initialized"));
   }
@@ -66,7 +69,15 @@ QScriptValue RasterCanvas::brushStroke(const QScriptValue &pointArray,
     return context()->throwError(tr("Need at least one point"));
   }
 
-  rasterBrush(m_raster, points, styleId, antialias);
+  if (lockAlpha) {
+    // Use RasterStrokeGenerator for lock-alpha support
+    RasterStrokeGenerator gen(m_raster, BRUSH, INK, styleId, points[0],
+                              false, 0, true, antialias);
+    for (size_t i = 1; i < points.size(); i++) gen.add(points[i]);
+    gen.generateStroke(!antialias);
+  } else {
+    rasterBrush(m_raster, points, styleId, antialias);
+  }
   return context()->thisObject();
 }
 

@@ -183,6 +183,24 @@ QScriptValue StageObject::getKeyframes(const QString &channel) {
   return arr;
 }
 
+QScriptValue StageObject::setExpression(double frame, const QString &channel,
+                                        const QString &expression) {
+  if (!m_obj) return context()->throwError(tr("StageObject is null"));
+
+  TDoubleParam *param = getChannelParam(channel);
+  if (!param) {
+    return context()->throwError(tr("Unknown channel '%1'").arg(channel));
+  }
+
+  TDoubleKeyframe kf;
+  kf.m_frame          = frame;
+  kf.m_type           = TDoubleKeyframe::Expression;
+  kf.m_expressionText = expression.toStdString();
+  param->setKeyframe(kf);
+
+  return context()->thisObject();
+}
+
 QScriptValue StageObject::setPlasticRig(const QScriptValue &rigArg) {
   if (!m_obj) return context()->throwError(tr("StageObject is null"));
 

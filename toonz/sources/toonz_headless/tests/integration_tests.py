@@ -738,6 +738,121 @@ def test_scene_ops():
 
 
 # ============================================================
+#  FILLED GEOMETRY
+# ============================================================
+
+def test_filled_geometry():
+    G = "Filled Geometry"
+
+    outpath = os.path.join(TESTDIR, "test_filled_rect.png")
+    test("addFilledRect renders with fill", [
+        f'''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var p = new Palette(); var ink = p.addColor(0,0,0,255); var red = p.addColor(255,0,0,255);
+        var lv = scene.newLevel("Vector", "fr");
+        var vi = new VectorImage();
+        vi.addFilledRect(-40, -40, 40, 40, 2, ink, red);
+        vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var renderer = new Renderer();
+        var img = renderer.renderFrame(scene, 0);
+        img.save("{outpath}");
+        print("ok regions=" + vi.regionCount)''',
+    ], lambda r: (file_exists_and_nonzero(outpath) and "regions=" in output_of(r),
+                  f"out={output_of(r)}"), group=G)
+
+    outpath2 = os.path.join(TESTDIR, "test_filled_circle.png")
+    test("addFilledCircle renders with fill", [
+        f'''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var p = new Palette(); var ink = p.addColor(0,0,0,255); var blue = p.addColor(0,0,255,255);
+        var lv = scene.newLevel("Vector", "fc");
+        var vi = new VectorImage();
+        vi.addFilledCircle(0, 0, 40, 2, ink, blue);
+        vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var renderer = new Renderer();
+        var img = renderer.renderFrame(scene, 0);
+        img.save("{outpath2}");
+        print("ok regions=" + vi.regionCount)''',
+    ], lambda r: (file_exists_and_nonzero(outpath2), f"out={output_of(r)}"), group=G)
+
+    outpath3 = os.path.join(TESTDIR, "test_filled_no_outline.png")
+    test("addFilledRect with invisible outline (inkStyle=0)", [
+        f'''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var p = new Palette(); var green = p.addColor(0,200,0,255);
+        var lv = scene.newLevel("Vector", "fno");
+        var vi = new VectorImage();
+        vi.addFilledRect(-30, -30, 30, 30, 0.1, 0, green);
+        vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var renderer = new Renderer();
+        var img = renderer.renderFrame(scene, 0);
+        img.save("{outpath3}");
+        print("ok")''',
+    ], lambda r: (file_exists_and_nonzero(outpath3), f"out={output_of(r)}"), group=G)
+
+
+# ============================================================
+#  LOCK-ALPHA
+# ============================================================
+
+def test_lock_alpha():
+    G = "Lock-Alpha"
+
+    outpath = os.path.join(TESTDIR, "test_lock_alpha.png")
+    test("brushStroke with lockAlpha=true", [
+        f'''var scene = new Scene(); scene.setCameraSize(64, 64);
+        var lv = scene.newLevel("ToonzRaster", "la");
+        var rc = new RasterCanvas(64, 64);
+        rc.brushStroke([[10,32,5],[54,32,5]], 1, true);
+        rc.brushStroke([[32,10,5],[32,54,5]], 1, true, true);
+        lv.setFrame(1, rc.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var renderer = new Renderer();
+        var img = renderer.renderFrame(scene, 0);
+        img.save("{outpath}");
+        print("ok " + img.width + "x" + img.height)''',
+    ], lambda r: (file_exists_and_nonzero(outpath), f"out={output_of(r)}"), group=G)
+
+
+# ============================================================
+#  EXPRESSION ANIMATION
+# ============================================================
+
+def test_expression_animation():
+    G = "Expression Animation"
+
+    test("setExpression sets expression keyframe type", [
+        '''var scene = new Scene();
+        scene.newLevel("Vector", "expr");
+        var obj = scene.getStageObject(0);
+        obj.setExpression(0, "x", "frame * 3");
+        var kfs = obj.getKeyframes("x");
+        print("type=" + kfs[0].type)''',
+    ], lambda r: (output_of(r) == "type=expression", f"out={output_of(r)}"), group=G)
+
+    outpath = os.path.join(TESTDIR, "test_expression_anim.png")
+    test("Expression-driven position renders correctly", [
+        f'''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var p = new Palette(); var ink = p.addColor(0,0,0,255);
+        var lv = scene.newLevel("Vector", "exr");
+        var vi = new VectorImage();
+        vi.addFilledCircle(0, 0, 10, 2, ink, ink);
+        vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        for (var r = 0; r < 5; r++) scene.setCell(r, 0, lv, 1);
+        var obj = scene.getStageObject(0);
+        obj.setExpression(0, "x", "frame * 8");
+        var renderer = new Renderer();
+        var img = renderer.renderFrame(scene, 3);
+        img.save("{outpath}");
+        print("ok " + img.width + "x" + img.height)''',
+    ], lambda r: (file_exists_and_nonzero(outpath), f"out={output_of(r)}"), group=G)
+
+
+# ============================================================
 #  MAIN
 # ============================================================
 
@@ -759,6 +874,9 @@ if __name__ == "__main__":
     test_stroke_styling()
     test_keyframe_ops()
     test_scene_ops()
+    test_filled_geometry()
+    test_lock_alpha()
+    test_expression_animation()
 
     # Summary
     print("\n" + "=" * 60)

@@ -58,6 +58,21 @@ public:
   Q_INVOKABLE QScriptValue addLine(double x1, double y1, double x2, double y2,
                                    double thickness, int styleId);
 
+  // Filled geometric primitives (strokes + auto-fill in one call)
+  Q_INVOKABLE QScriptValue addFilledRect(double x1, double y1, double x2,
+                                         double y2, double thickness,
+                                         int inkStyleId, int fillStyleId);
+  Q_INVOKABLE QScriptValue addFilledCircle(double cx, double cy, double radius,
+                                           double thickness, int inkStyleId,
+                                           int fillStyleId, int segments = 16);
+  Q_INVOKABLE QScriptValue addFilledPolygon(double cx, double cy, double radius,
+                                            int sides, double thickness,
+                                            int inkStyleId, int fillStyleId);
+  Q_INVOKABLE QScriptValue addFilledEllipse(double cx, double cy, double rx,
+                                            double ry, double thickness,
+                                            int inkStyleId, int fillStyleId,
+                                            int segments = 16);
+
   // Palette
   Q_INVOKABLE QScriptValue setPalette(const QScriptValue &paletteArg);
 

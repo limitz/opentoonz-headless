@@ -30,7 +30,8 @@ public:
 
   // Drawing
   Q_INVOKABLE QScriptValue brushStroke(const QScriptValue &pointArray,
-                                       int styleId, bool antialias = true);
+                                       int styleId, bool antialias = true,
+                                       bool lockAlpha = false);
   Q_INVOKABLE QScriptValue fill(int x, int y, int styleId);
   Q_INVOKABLE QScriptValue rectFill(int x1, int y1, int x2, int y2,
                                     int styleId);
