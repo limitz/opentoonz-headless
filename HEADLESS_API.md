@@ -554,6 +554,28 @@ print(names.length + " parameters available");
 
 10. **Save format determined by extension.** `.pli` = vector, `.tlv` = toonz raster, `.png`/`.tif` = full color raster.
 
+11. **Fillable regions require multiple strokes.** A single closed stroke (`stroke.close()`) does **not** create a fillable region. OpenToonz computes regions from intersections between separate strokes. To create a fillable shape, draw it as multiple strokes sharing endpoints:
+
+    ```javascript
+    // WRONG — single self-loop, fill() will fail (0 regions)
+    var s = new Stroke();
+    s.addPoints([[-50,-50,2],[50,-50,2],[50,50,2],[-50,50,2],[-50,-50,2]]);
+    s.build(); s.close(); s.setStyle(ink);
+    vi.addStroke(s);
+    vi.fill(0, 0, red); // Error: no region found
+
+    // CORRECT — 4 edge strokes, fill() works (1 region)
+    var top = new Stroke(); top.addPoints([[-50,-50,2],[50,-50,2]]); top.build(); top.setStyle(ink); vi.addStroke(top);
+    var right = new Stroke(); right.addPoints([[50,-50,2],[50,50,2]]); right.build(); right.setStyle(ink); vi.addStroke(right);
+    var bottom = new Stroke(); bottom.addPoints([[50,50,2],[-50,50,2]]); bottom.build(); bottom.setStyle(ink); vi.addStroke(bottom);
+    var left = new Stroke(); left.addPoints([[-50,50,2],[-50,-50,2]]); left.build(); left.setStyle(ink); vi.addStroke(left);
+    vi.fill(0, 0, red); // OK — fills the enclosed region
+    ```
+
+12. **Points are Bezier control points, not polygon vertices.** Strokes interpolate smoothly between points. A single stroke with 4 points will render as a smooth curve, not a square. For sharp corners, use separate strokes — one per edge — meeting at the corner point. For smooth curves like circles, use more points on a single stroke (16+ for a clean circle).
+
+13. **RasterCanvas requires a palette for colored output.** Call `rc.setPalette(pal)` before `toImage()` to get colored PNG output. Without a palette, only style 1 (default black) is visible.
+
 ---
 
 ## Binary Location and Build

@@ -31,6 +31,7 @@ QScriptValue Stroke::addPoint(double x, double y, double thickness) {
     return context()->throwError(
         tr("Cannot add points to an already built stroke"));
   }
+  if (thickness < 0) thickness = 0;
   m_points.push_back(TThickPoint(x, y, thickness));
   return context()->thisObject();
 }
@@ -53,6 +54,7 @@ QScriptValue Stroke::addPoints(const QScriptValue &pointArray) {
     double x = pt.property(0).toNumber();
     double y = pt.property(1).toNumber();
     double t = pt.property(2).isUndefined() ? 1.0 : pt.property(2).toNumber();
+    if (t < 0) t = 0;
     m_points.push_back(TThickPoint(x, y, t));
   }
   return context()->thisObject();

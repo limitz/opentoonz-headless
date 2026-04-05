@@ -30,6 +30,14 @@ QScriptValue Effect::ctor(QScriptContext *context, QScriptEngine *engine) {
         QObject::tr("Unknown effect type '%1'").arg(fxType));
   }
 
+  // Verify the created effect actually matches the requested type
+  std::string actualType = fx->getFxType();
+  if (actualType != fxType.toStdString()) {
+    delete fx;
+    return context->throwError(
+        QObject::tr("Unknown effect type '%1'").arg(fxType));
+  }
+
   return create(engine, new Effect(TFxP(fx)));
 }
 

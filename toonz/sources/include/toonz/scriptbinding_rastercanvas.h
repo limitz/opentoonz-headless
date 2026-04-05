@@ -5,13 +5,19 @@
 
 #include "toonz/scriptbinding.h"
 #include "trastercm.h"
+#include "tpalette.h"
+
+class TPalette;
 
 namespace TScriptBinding {
+
+class Palette;
 
 class DVAPI RasterCanvas final : public Wrapper {
   Q_OBJECT
 
   TRasterCM32P m_raster;
+  TPaletteP m_palette;
   int m_width, m_height;
 
 public:
@@ -31,6 +37,9 @@ public:
   Q_INVOKABLE QScriptValue inkFill(int x, int y, int styleId,
                                    int searchRay = 10);
   Q_INVOKABLE QScriptValue clear();
+
+  // Palette (optional — a default is created if not set)
+  Q_INVOKABLE QScriptValue setPalette(const QScriptValue &paletteArg);
 
   // Convert to Image for Level.setFrame
   Q_INVOKABLE QScriptValue toImage();

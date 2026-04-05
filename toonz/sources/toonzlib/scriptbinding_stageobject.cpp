@@ -58,6 +58,8 @@ TDoubleKeyframe::Type StageObject::parseInterpolationType(
 QScriptValue StageObject::setKeyframe(double frame, const QString &channel,
                                       double value) {
   if (!m_obj) return context()->throwError(tr("StageObject is null"));
+  if (frame < 0)
+    return context()->throwError(tr("Frame must be >= 0, got %1").arg(frame));
 
   TDoubleParam *param = getChannelParam(channel);
   if (!param) {
