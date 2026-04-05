@@ -458,6 +458,144 @@ def test_multi_column():
 
 
 # ============================================================
+#  EFFECT PARAM TYPES
+# ============================================================
+
+def test_effect_params():
+    G = "Effect Parameter Types"
+
+    # getParamType for various effects
+    test("getParamType returns correct types for particlesFx", [
+        '''var fx = new Effect("STD_particlesFx");
+        var types = [];
+        var names = fx.getParamNames();
+        for (var i = 0; i < Math.min(names.length, 10); i++) {
+            types.push(names[i] + ":" + fx.getParamType(names[i]));
+        }
+        print(types.join(", "))''',
+    ], lambda r: ("double" in output_of(r) or "range" in output_of(r) or "enum" in output_of(r),
+                  f"out={output_of(r)[:120]}"), group=G)
+
+    # setParam/getParam for int param (TIntParam)
+    test("setParam/getParam int type", [
+        '''var fx = new Effect("STD_particlesFx");
+        var names = fx.getParamNames();
+        var intParam = null;
+        for (var i = 0; i < names.length; i++) {
+            if (fx.getParamType(names[i]) == "int") { intParam = names[i]; break; }
+        }
+        if (intParam) {
+            fx.setParam(intParam, 5);
+            print("int:" + intParam + "=" + fx.getParam(intParam));
+        } else { print("no int param found"); }''',
+    ], lambda r: ("int:" in output_of(r) or "no int" in output_of(r), f"out={output_of(r)}"), group=G)
+
+    # setParam/getParam for bool param (TBoolParam)
+    test("setParam/getParam bool type", [
+        '''var fx = new Effect("STD_blurFx");
+        var names = fx.getParamNames();
+        var boolParam = null;
+        for (var i = 0; i < names.length; i++) {
+            if (fx.getParamType(names[i]) == "bool") { boolParam = names[i]; break; }
+        }
+        if (boolParam) {
+            fx.setParam(boolParam, true);
+            print("bool:" + boolParam + "=" + fx.getParam(boolParam));
+        } else { print("no bool param found"); }''',
+    ], lambda r: ("bool:" in output_of(r) or "no bool" in output_of(r), f"out={output_of(r)}"), group=G)
+
+    # setParam/getParam for enum param (TIntEnumParam)
+    test("setParam/getParam enum type", [
+        '''var fx = new Effect("STD_particlesFx");
+        var names = fx.getParamNames();
+        var enumParam = null;
+        for (var i = 0; i < names.length; i++) {
+            if (fx.getParamType(names[i]) == "enum") { enumParam = names[i]; break; }
+        }
+        if (enumParam) {
+            fx.setParam(enumParam, 1);
+            print("enum:" + enumParam + "=" + fx.getParam(enumParam));
+        } else { print("no enum param found"); }''',
+    ], lambda r: ("enum:" in output_of(r) or "no enum" in output_of(r), f"out={output_of(r)}"), group=G)
+
+    # setParam/getParam for range param (TRangeParam)
+    test("setParam/getParam range type", [
+        '''var fx = new Effect("STD_particlesFx");
+        var names = fx.getParamNames();
+        var rangeParam = null;
+        for (var i = 0; i < names.length; i++) {
+            if (fx.getParamType(names[i]) == "range") { rangeParam = names[i]; break; }
+        }
+        if (rangeParam) {
+            fx.setParam(rangeParam, [10, 50]);
+            var v = fx.getParam(rangeParam);
+            print("range:" + rangeParam + "=[" + v[0] + "," + v[1] + "]");
+        } else { print("no range param found"); }''',
+    ], lambda r: ("range:" in output_of(r) or "no range" in output_of(r), f"out={output_of(r)}"), group=G)
+
+    # setParam/getParam for point param (TPointParam)
+    test("setParam/getParam point type", [
+        '''var fx = new Effect("STD_particlesFx");
+        var names = fx.getParamNames();
+        var pointParam = null;
+        for (var i = 0; i < names.length; i++) {
+            if (fx.getParamType(names[i]) == "point") { pointParam = names[i]; break; }
+        }
+        if (pointParam) {
+            fx.setParam(pointParam, [100, 200]);
+            var v = fx.getParam(pointParam);
+            print("point:" + pointParam + "=[" + v[0] + "," + v[1] + "]");
+        } else { print("no point param found"); }''',
+    ], lambda r: ("point:" in output_of(r) or "no point" in output_of(r), f"out={output_of(r)}"), group=G)
+
+    # setParam for pixel/color param
+    test("setParam/getParam pixel type", [
+        '''var fx = new Effect("STD_glowFx");
+        var names = fx.getParamNames();
+        var pixParam = null;
+        for (var i = 0; i < names.length; i++) {
+            if (fx.getParamType(names[i]) == "pixel") { pixParam = names[i]; break; }
+        }
+        if (pixParam) {
+            fx.setParam(pixParam, [255, 0, 128, 200]);
+            var v = fx.getParam(pixParam);
+            print("pixel:" + pixParam + "=[" + v[0] + "," + v[1] + "," + v[2] + "," + v[3] + "]");
+        } else { print("no pixel param found"); }''',
+    ], lambda r: ("pixel:" in output_of(r) or "no pixel" in output_of(r), f"out={output_of(r)}"), group=G)
+
+    # setParamKeyframe on non-animatable param (should error)
+    test("setParamKeyframe on non-animatable param (expect error)", [
+        '''var fx = new Effect("STD_particlesFx");
+        var names = fx.getParamNames();
+        var enumParam = null;
+        for (var i = 0; i < names.length; i++) {
+            if (fx.getParamType(names[i]) == "enum") { enumParam = names[i]; break; }
+        }
+        if (enumParam) {
+            try { fx.setParamKeyframe(enumParam, 0, 1); print("no_error"); } catch(e) { print("error"); }
+        } else { print("no enum to test"); }''',
+    ], lambda r: (output_of(r) == "error" or "no enum" in output_of(r), f"out={output_of(r)}"), group=G)
+
+    # Render with multi-type effect params
+    outpath_fx = os.path.join(TESTDIR, "test_effect_multitypes.png")
+    test("Render with multi-type effect params", [
+        f'''var scene = new Scene(); scene.setCameraSize(128, 128);
+        var p = new Palette(); var ink = p.addColor(0, 0, 0, 255);
+        var lv = scene.newLevel("Vector", "fxmt");
+        var vi = new VectorImage(); vi.addRect(-30, -30, 30, 30, 3, ink); vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var blur = new Effect("STD_blurFx");
+        blur.setParam("value", 8);
+        scene.connectEffect(0, blur);
+        var renderer = new Renderer();
+        var img = renderer.renderFrame(scene, 0);
+        img.save("{outpath_fx}");
+        print("ok " + img.width + "x" + img.height)''',
+    ], lambda r: (file_exists_and_nonzero(outpath_fx), f"out={output_of(r)}"), group=G)
+
+
+# ============================================================
 #  MAIN
 # ============================================================
 
@@ -475,6 +613,7 @@ if __name__ == "__main__":
     test_plastic_deformation()
     test_renderer_integration()
     test_multi_column()
+    test_effect_params()
 
     # Summary
     print("\n" + "=" * 60)

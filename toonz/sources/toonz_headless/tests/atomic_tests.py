@@ -1803,10 +1803,20 @@ def test_missing_features():
         scene.connectEffect(0, fx); print("connected")''',
     ], lambda r: (output_of(r) == "connected", f"out={output_of(r)}"), group=G)
 
-    # Renderer with effects
-    test("[GAP] Renderer with effects applied", [
-        'print("Cannot render scene with effects since effects cannot be connected to columns")',
-    ], lambda r: (True, "NO API - Effect -> Scene connection missing, so rendered output has no FX"), group=G)
+    # Renderer with effects — IMPLEMENTED (connectEffect + renderFrame)
+    test("[IMPLEMENTED] Renderer with effects applied (connectEffect + renderFrame)", [
+        '''var scene = new Scene(); scene.setCameraSize(64, 64);
+        var lv = scene.newLevel("Vector", "fxrnd");
+        var p = new Palette(); var ink = p.addColor(0, 0, 0, 255);
+        var vi = new VectorImage(); vi.addRect(-20, -20, 20, 20, 2, ink); vi.setPalette(p);
+        lv.setFrame(1, vi.toImage());
+        scene.setCell(0, 0, lv, 1);
+        var blur = new Effect("STD_blurFx"); blur.setParam("value", 10);
+        scene.connectEffect(0, blur);
+        var renderer = new Renderer();
+        var img = renderer.renderFrame(scene, 0);
+        print("rendered " + img.width + "x" + img.height)''',
+    ], lambda r: ("rendered" in output_of(r), f"out={output_of(r)}"), group=G)
 
     # Smoothing / acceleration settings for strokes
     test("[GAP] Stroke smoothing/acceleration controls", [

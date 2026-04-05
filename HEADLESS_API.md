@@ -372,11 +372,21 @@ Create and configure any of the 145 built-in OpenToonz effects.
 ```javascript
 var fx = new Effect("STD_particlesFx");   // MUST include STD_ prefix
 
-// Parameters
+// Parameter access
 var names = fx.getParamNames();           // Array of parameter name strings
-fx.setParam(name, value);                 // Set default value
+var type = fx.getParamType(name);         // "double","int","bool","enum","point","pixel","range","string","filepath"
+fx.setParam(name, value);                 // Set value (type auto-detected)
 var v = fx.getParam(name);                // Read current value
-fx.setParamKeyframe(name, frame, value);  // Animate parameter
+fx.setParamKeyframe(name, frame, value);  // Animate (double/point/pixel/range only)
+
+// Value types by parameter type:
+fx.setParam("blur_value", 10.5);          // double/int — number
+fx.setParam("use_sse", true);             // bool — boolean
+fx.setParam("swing_mode", 2);             // enum — integer index
+fx.setParam("center", [100, 50]);         // point — [x, y]
+fx.setParam("color", [255, 0, 0, 255]);   // pixel — [r, g, b, a]
+fx.setParam("lifetime", [20, 100]);       // range — [min, max]
+fx.setParam("text", "hello");             // string — string
 ```
 
 **Properties:** `type` (string), `paramCount` (int)

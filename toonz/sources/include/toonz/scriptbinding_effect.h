@@ -22,10 +22,12 @@ public:
   Q_INVOKABLE QScriptValue toString();
 
   // Parameter access
-  Q_INVOKABLE QScriptValue setParam(const QString &name, double value);
+  Q_INVOKABLE QScriptValue setParam(const QString &name,
+                                    const QScriptValue &value);
   Q_INVOKABLE QScriptValue getParam(const QString &name);
+  Q_INVOKABLE QScriptValue getParamType(const QString &name);
   Q_INVOKABLE QScriptValue setParamKeyframe(const QString &name, double frame,
-                                            double value);
+                                            const QScriptValue &value);
   Q_INVOKABLE QScriptValue getParamNames();
 
   // Properties
