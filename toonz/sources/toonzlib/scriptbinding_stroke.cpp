@@ -90,6 +90,33 @@ int Stroke::getPointCount() const {
   return m_stroke ? m_stroke->getControlPointCount() : (int)m_points.size();
 }
 
+QScriptValue Stroke::getPoint(int index) {
+  if (m_stroke) {
+    int n = m_stroke->getControlPointCount();
+    if (index < 0 || index >= n)
+      return context()->throwError(
+          tr("Point index %1 out of range [0, %2)").arg(index).arg(n));
+    TThickPoint p = m_stroke->getControlPoint(index);
+    QScriptValue arr = engine()->newArray(3);
+    arr.setProperty(0, p.x);
+    arr.setProperty(1, p.y);
+    arr.setProperty(2, p.thick);
+    return arr;
+  } else {
+    if (index < 0 || index >= (int)m_points.size())
+      return context()->throwError(
+          tr("Point index %1 out of range [0, %2)")
+              .arg(index)
+              .arg(m_points.size()));
+    TThickPoint p = m_points[index];
+    QScriptValue arr = engine()->newArray(3);
+    arr.setProperty(0, p.x);
+    arr.setProperty(1, p.y);
+    arr.setProperty(2, p.thick);
+    return arr;
+  }
+}
+
 int Stroke::getStyle() const { return m_styleId; }
 
 void Stroke::setStyleProp(int v) {

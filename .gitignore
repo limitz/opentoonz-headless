@@ -39,3 +39,5 @@ ipch/
 #macOS
 .DS_Store
 
+*.jpg
+*.png

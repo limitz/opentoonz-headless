@@ -36,6 +36,7 @@ public:
 
   Q_INVOKABLE QScriptValue load(const QScriptValue &fp);
   Q_INVOKABLE QScriptValue save(const QScriptValue &fp);
+  Q_INVOKABLE QScriptValue toVectorImage();
 };
 
 QScriptValue checkImage(QScriptContext *context, const QScriptValue &value,

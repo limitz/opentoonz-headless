@@ -46,6 +46,8 @@ public:
   Q_PROPERTY(int pointCount READ getPointCount)
   int getPointCount() const;
 
+  Q_INVOKABLE QScriptValue getPoint(int index);
+
   Q_PROPERTY(int style READ getStyle WRITE setStyleProp)
   int getStyle() const;
   void setStyleProp(int v);

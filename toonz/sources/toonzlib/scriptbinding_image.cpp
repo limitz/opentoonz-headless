@@ -3,6 +3,8 @@
 #include "toonz/scriptbinding_image.h"
 #include "toonz/scriptbinding_level.h"
 #include "toonz/scriptbinding_files.h"
+#include "toonz/scriptbinding_vectorimage.h"
+#include "tvectorimage.h"
 #include "tsystem.h"
 #include "ttoonzimage.h"
 #include "trasterimage.h"
@@ -258,6 +260,18 @@ QScriptValue Image::save(const QScriptValue &fpArg) {
     return context()->throwError(
         tr("Unexpected error while writing image").arg(fpStr));
   }
+}
+
+QScriptValue Image::toVectorImage() {
+  if (!m_img || m_img->getType() != TImage::VECTOR) {
+    return context()->throwError(
+        tr("Image is not a vector image (type is %1)").arg(getType()));
+  }
+  TVectorImageP vi = m_img;
+  if (!vi) {
+    return context()->throwError(tr("Failed to extract vector image data"));
+  }
+  return create(new VectorImage(vi));
 }
 
 QScriptValue checkImage(QScriptContext *context, const QScriptValue &value,
