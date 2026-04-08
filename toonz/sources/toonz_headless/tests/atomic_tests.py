@@ -2149,6 +2149,79 @@ def test_cleanupper():
     ], lambda r: (output_of(r, 2) == "ToonzRaster", f"type={output_of(r, 2)}"), group=G)
 
 
+def test_audio_lipsync():
+    G = "Audio & Lip Sync"
+
+    # Audio class creation
+    test("Audio create", [
+        'var a = new Audio(); print(a.toString())',
+    ], lambda r: ("Audio" in output_of(r), f"got={output_of(r)}"), group=G)
+
+    # Generate a test WAV file for audio tests
+    import struct, wave, math
+    wav_path = os.path.join(TESTDIR, "test_audio.wav")
+    with wave.open(wav_path, 'w') as f:
+        f.setnchannels(1)
+        f.setsampwidth(2)
+        f.setframerate(44100)
+        for i in range(22050):  # 0.5 seconds
+            val = int(16000 * math.sin(2 * math.pi * 440 * i / 44100))
+            f.writeframes(struct.pack('<h', val))
+
+    # loadAudio returns info object
+    test("Audio.loadAudio returns info", [
+        'var scene = new Scene(); scene.setFrameRate(24);'
+        'var audio = new Audio();'
+        f'var info = audio.loadAudio(scene, "{wav_path}", 0);'
+        'print(info.frames + "," + info.sampleRate + "," + info.channels)',
+    ], lambda r: ("12,44100,1" == output_of(r), f"got={output_of(r)}"), group=G)
+
+    # Create lip sync data file
+    lipsync_path = os.path.join(TESTDIR, "test_lipsync.txt")
+    with open(lipsync_path, 'w') as f:
+        f.write("1 ai\n5 mbp\n8 e\n12 rest\n")
+
+    # applyLipSync
+    test("Audio.applyLipSync", [
+        'var scene = new Scene(); scene.setCameraSize(64, 64);'
+        'var lv = scene.newLevel("Vector", "mouths");'
+        'var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        'for (var i = 1; i <= 4; i++) {'
+        '  var vi = new VectorImage(); vi.addCircle(0, i*5, 10, 2, ink); vi.setPalette(pal);'
+        '  lv.setFrame(i, vi.toImage());'
+        '}',
+        'var audio = new Audio();'
+        'var map = {"ai": 1, "e": 2, "o": 3, "mbp": 4, "rest": 1};'
+        f'var count = audio.applyLipSync(scene, 0, lv, map, "{lipsync_path}", 0);'
+        'print(count)',
+    ], lambda r: (output_of(r, 1) == "12" and not has_error(r, 1),
+                  f"cells={output_of(r, 1)}"), group=G)
+
+    # Verify lip sync cell assignments
+    test("Lip sync cell verification", [
+        'var scene = new Scene(); scene.setCameraSize(64, 64);'
+        'var lv = scene.newLevel("Vector", "mouths");'
+        'var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        'for (var i = 1; i <= 4; i++) {'
+        '  var vi = new VectorImage(); vi.addCircle(0, i*5, 10, 2, ink); vi.setPalette(pal);'
+        '  lv.setFrame(i, vi.toImage());'
+        '}',
+        'var audio = new Audio();'
+        'var map = {"ai": 1, "e": 2, "mbp": 4, "rest": 1};'
+        f'audio.applyLipSync(scene, 0, lv, map, "{lipsync_path}", 0);'
+        'var c0 = scene.getCell(0, 0); var c4 = scene.getCell(4, 0); var c7 = scene.getCell(7, 0);'
+        'print(c0.fid + "," + c4.fid + "," + c7.fid)',
+    ], lambda r: (output_of(r, 1) == "1,4,2", f"cells={output_of(r, 1)}"), group=G)
+
+    # loadAudio error: file not found
+    test("Audio.loadAudio error: missing file", [
+        'var scene = new Scene(); scene.setFrameRate(24);'
+        'var audio = new Audio();'
+        'var info = audio.loadAudio(scene, "/tmp/nonexistent_audio.wav", 0);'
+        'print(info)',
+    ], lambda r: (has_error(r), "should error for missing file"), group=G)
+
+
 def test_format_conversion():
     G = "Format Conversion"
 
@@ -2259,6 +2332,7 @@ if __name__ == "__main__":
     test_tracker()
     test_format_conversion()
     test_export()
+    test_audio_lipsync()
 
     # Summary
     print("\n" + "=" * 60)

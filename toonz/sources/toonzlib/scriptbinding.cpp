@@ -23,6 +23,7 @@
 #include "toonz/scriptbinding_effect.h"
 #include "toonz/scriptbinding_cleanupper.h"
 #include "toonz/scriptbinding_tracker.h"
+#include "toonz/scriptbinding_audio.h"
 #include "toonz/tcenterlinevectorizer.h"
 #include "toonz/tcamera.h"
 #include "toonz/stage.h"
@@ -194,6 +195,7 @@ void bindAll(QScriptEngine &engine) {
   bindClass<Effect>(engine, "Effect");
   bindClass<Cleanupper>(engine, "Cleanupper");
   bindClass<Tracker>(engine, "Tracker");
+  bindClass<Audio>(engine, "Audio");
 
   // Setup any static methods
   setupStaticMethods(engine);

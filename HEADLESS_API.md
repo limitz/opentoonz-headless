@@ -771,6 +771,85 @@ img.save("/tmp/plastic_deform.png");
 
 ---
 
+## Audio
+
+Load and analyze audio files (WAV, AIFF). Audio data is returned as an info object with duration and format details.
+
+```javascript
+var audio = new Audio();
+
+// Load audio file and get info
+var info = audio.loadAudio(scene, "/path/to/dialogue.wav", 0);
+print(info.frames);      // Duration in frames (at scene frame rate)
+print(info.duration);    // Duration in seconds
+print(info.sampleRate);  // e.g., 44100
+print(info.sampleCount); // Total samples
+print(info.channels);    // 1 (mono) or 2 (stereo)
+print(info.bitDepth);    // e.g., 16
+```
+
+**Supported formats:** WAV, AIFF (native). MP3, OGG, FLAC, M4A (if FFmpeg is available).
+
+**Note:** Sound column insertion into the XSheet is not yet supported in headless mode due to scene initialization requirements. Use `loadAudio()` for audio analysis and timing, then drive animation via `setCell()` and keyframes.
+
+---
+
+## Lip Sync
+
+Apply phoneme timing data to XSheet cells, mapping phoneme codes to mouth shape drawings.
+
+```javascript
+var audio = new Audio();
+
+// Prepare mouth shapes level (one drawing per phoneme)
+var mouths = scene.newLevel("Vector", "mouths");
+// ... create mouth drawings for frames 1-10 ...
+
+// Define phoneme → frame ID mapping
+var phonemeMap = {
+    "ai":   1,   // wide open mouth
+    "e":    2,   // smile
+    "o":    3,   // round
+    "u":    4,   // small round
+    "mbp":  5,   // closed lips
+    "fv":   6,   // teeth on lip
+    "l":    7,   // tongue
+    "wq":   8,   // pursed
+    "other": 9,  // slightly open
+    "rest": 10   // neutral
+};
+
+// Apply lip sync data from a text file
+var cellsSet = audio.applyLipSync(scene, targetCol, mouths, phonemeMap,
+                                   "/path/to/lipsync.txt", startFrame);
+print("Set " + cellsSet + " cells");
+```
+
+### Lip Sync Data Format
+
+Plain text, one entry per line: `frame phoneme`
+
+```
+1 ai
+5 mbp
+8 e
+12 rest
+```
+
+Each phoneme is held until the next entry's frame number. Frame numbers are relative to `startFrame`.
+
+### Rhubarb Integration
+
+For automatic speech-to-phoneme analysis, use [Rhubarb Lip Sync](https://github.com/DanielSWolf/rhubarb-lip-sync) externally:
+
+```bash
+rhubarb -o output.txt -f dat --datUsePrestonBlair --datFrameRate 24 dialogue.wav
+```
+
+Then feed the output file to `applyLipSync()`.
+
+---
+
 ## Format Conversion (Level)
 
 ### Cross-Format Save

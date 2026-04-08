@@ -17,6 +17,9 @@
 void initStdFx();
 void initColorFx();
 
+// Sound I/O init (from sound library)
+void initSoundIo();
+
 //=========================================================
 // JSON-RPC handler that wraps ScriptEngine
 //=========================================================
@@ -169,6 +172,7 @@ int main(int argc, char *argv[]) {
 
   Tiio::defineStd();
   initImageIo();
+  initSoundIo();
   initStdFx();
   initColorFx();
 

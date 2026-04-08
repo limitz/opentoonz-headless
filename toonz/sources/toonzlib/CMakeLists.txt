@@ -25,6 +25,7 @@ set(MOC_HEADERS
     ../include/toonz/scriptbinding_effect.h
     ../include/toonz/scriptbinding_cleanupper.h
     ../include/toonz/scriptbinding_tracker.h
+    ../include/toonz/scriptbinding_audio.h
     ../include/toonz/scriptengine.h
     ../include/toonz/stylemanager.h
     ../include/toonz/tcenterlinevectorizer.h
@@ -244,6 +245,7 @@ set(SOURCES
     scriptbinding_effect.cpp
     scriptbinding_cleanupper.cpp
     scriptbinding_tracker.cpp
+    scriptbinding_audio.cpp
     tracker_objecttracker.cpp
     tracker_predict3d.cpp
     tracker_metnum.cpp
