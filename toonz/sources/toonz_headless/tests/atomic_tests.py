@@ -2149,6 +2149,74 @@ def test_cleanupper():
     ], lambda r: (output_of(r, 2) == "ToonzRaster", f"type={output_of(r, 2)}"), group=G)
 
 
+def test_format_conversion():
+    G = "Format Conversion"
+
+    # Level.getDpi / setDpi
+    test("Level getDpi default", [
+        'var scene = new Scene(); var lv = scene.newLevel("ToonzRaster", "t");'
+        'print(lv.getDpi())',
+    ], lambda r: (float(output_of(r)) > 0, f"dpi={output_of(r)}"), group=G)
+
+    test("Level setDpi", [
+        'var scene = new Scene(); var lv = scene.newLevel("ToonzRaster", "t");'
+        'lv.setDpi(150); print(lv.getDpi())',
+    ], lambda r: (output_of(r) == "150", f"dpi={output_of(r)}"), group=G)
+
+    # Level.saveAs (ToonzRaster -> PNG)
+    test("Level.saveAs ToonzRaster to PNG", [
+        'var rc = new RasterCanvas(64, 64);'
+        'var pal = new Palette(); var ink = pal.addColor(255,0,0,255);'
+        'rc.setPalette(pal);'
+        'rc.brushStroke([[10,32,3],[54,32,3]], ink, true);'
+        'var lv = new Level(); lv.setFrame(1, rc.toImage()); lv.setFrame(2, rc.toImage());',
+        f'lv.saveAs("{TESTDIR}/test_saveAs..png"); print("done")',
+    ], lambda r: (output_of(r, 1) == "done" and
+                  file_exists_and_nonzero(os.path.join(TESTDIR, "test_saveAs.0001.png")),
+                  f"out={output_of(r, 1)}"), group=G)
+
+    # Level.saveAs (Vector -> PNG would need rasterizer, test that it doesn't crash)
+    test("Level.saveAs single frame TIF", [
+        'var rc = new RasterCanvas(32, 32);'
+        'var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        'rc.setPalette(pal);'
+        'rc.brushStroke([[5,16,2],[27,16,2]], ink, true);'
+        'var lv = new Level(); lv.setFrame(1, rc.toImage());',
+        f'lv.saveAs("{TESTDIR}/test_saveAs_tif..tif"); print("done")',
+    ], lambda r: (output_of(r, 1) == "done", f"out={output_of(r, 1)}"), group=G)
+
+
+def test_export():
+    G = "Export/Interchange"
+
+    # Scene.getCamera
+    test("Scene.getCamera", [
+        'var scene = new Scene(); scene.setCameraSize(128, 128);'
+        'var cam = scene.getCamera(); print(cam.name)',
+    ], lambda r: ("Camera" in output_of(r), f"name={output_of(r)}"), group=G)
+
+    # Camera keyframe access
+    test("Camera keyframe access", [
+        'var scene = new Scene(); scene.setCameraSize(128, 128);'
+        'var cam = scene.getCamera();'
+        'cam.setKeyframe(0, "x", 0); cam.setKeyframe(24, "x", 100);'
+        'print(cam.getValueAt(12, "x"))',
+    ], lambda r: (not has_error(r) and len(output_of(r)) > 0,
+                  f"val={output_of(r)}"), group=G)
+
+    # Scene.exportResources
+    test("Scene.exportResources", [
+        'var scene = new Scene(); scene.setCameraSize(64, 64);'
+        'var lv = scene.newLevel("Vector", "exportTest");'
+        'var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        'var vi = new VectorImage(); vi.addCircle(0,0,20,2,ink); vi.setPalette(pal);'
+        'lv.setFrame(1, vi.toImage()); scene.setCell(0, 0, lv, 1);',
+        f'var files = scene.exportResources("{TESTDIR}/export_test");'
+        'print("count:" + files.length)',
+    ], lambda r: ("count:" in output_of(r, 1) and not has_error(r, 1),
+                  f"out={output_of(r, 1)}"), group=G)
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("  COMPREHENSIVE ATOMIC TEST SUITE")
@@ -2189,6 +2257,8 @@ if __name__ == "__main__":
     test_rendering_output()
     test_cleanupper()
     test_tracker()
+    test_format_conversion()
+    test_export()
 
     # Summary
     print("\n" + "=" * 60)

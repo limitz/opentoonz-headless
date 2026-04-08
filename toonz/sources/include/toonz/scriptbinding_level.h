@@ -54,6 +54,10 @@ public:
   Q_INVOKABLE QScriptValue getFrameIds();
   Q_INVOKABLE QScriptValue load(const QScriptValue &fp);
   Q_INVOKABLE QScriptValue save(const QScriptValue &fp);
+  Q_INVOKABLE QScriptValue saveAs(const QScriptValue &fp);
+
+  Q_INVOKABLE QScriptValue getDpi();
+  Q_INVOKABLE QScriptValue setDpi(double dpi);
 
   // Palette
   Q_INVOKABLE QScriptValue setPalette(const QScriptValue &paletteArg);

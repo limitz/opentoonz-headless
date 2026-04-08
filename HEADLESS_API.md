@@ -771,6 +771,78 @@ img.save("/tmp/plastic_deform.png");
 
 ---
 
+## Format Conversion (Level)
+
+### Cross-Format Save
+
+`Level.saveAs(path)` saves a level to any supported format, converting automatically:
+
+```javascript
+// ToonzRaster level → PNG sequence
+var lv = new Level();
+lv.setFrame(1, rc.toImage());
+lv.setFrame(2, rc.toImage());
+lv.saveAs("/output/myLevel..png");    // Creates myLevel.0001.png, myLevel.0002.png
+
+// ToonzRaster → TIF sequence
+lv.saveAs("/output/myLevel..tif");
+
+// Same-format save (equivalent to save())
+lv.saveAs("/output/myLevel..tlv");
+```
+
+Unlike `Level.save()` which only saves to the same format, `saveAs()` handles ToonzRaster→PNG/TIF/TGA conversion by rendering through the palette.
+
+### DPI Control
+
+```javascript
+var lv = scene.newLevel("ToonzRaster", "myLevel");
+print(lv.getDpi());    // Returns current DPI (default varies)
+lv.setDpi(150);        // Set DPI for the level
+print(lv.getDpi());    // 150
+```
+
+---
+
+## Export/Interchange
+
+### Camera Access
+
+Access the camera as a StageObject to read/write camera animation:
+
+```javascript
+var cam = scene.getCamera();
+print(cam.name);  // "Camera1"
+
+// Animate camera movement
+cam.setKeyframe(0, "x", 0);
+cam.setKeyframe(24, "x", 100);
+cam.setKeyframe(0, "y", 0);
+cam.setKeyframe(24, "y", 50);
+
+// Read camera keyframes (for export to external tools)
+var kfs = cam.getKeyframes("x");
+for (var i = 0; i < kfs.length; i++) {
+    print("frame " + kfs[i].frame + ": x=" + kfs[i].value);
+}
+```
+
+### Export Scene Resources
+
+Collect all scene assets (levels, scene file) to a destination folder:
+
+```javascript
+var files = scene.exportResources("/path/to/export");
+print("Exported " + files.length + " files");
+for (var i = 0; i < files.length; i++) {
+    print("  " + files[i]);
+}
+```
+
+This creates a self-contained copy of the scene with all referenced levels.
+
+---
+
 ## Compositing/FX (Extended)
 
 The FX graph can now be manipulated beyond single-column effects.

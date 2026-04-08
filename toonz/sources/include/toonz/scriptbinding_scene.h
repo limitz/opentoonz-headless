@@ -68,6 +68,10 @@ public:
   // Camera
   Q_INVOKABLE QScriptValue setCameraSize(int w, int h);
   Q_INVOKABLE QScriptValue getCameraSize();
+  Q_INVOKABLE QScriptValue getCamera();
+
+  // Export
+  Q_INVOKABLE QScriptValue exportResources(const QString &destDir);
 
   // Mesh generation for plastic deformation
   Q_INVOKABLE QScriptValue buildMesh(const QScriptValue &imageArg,

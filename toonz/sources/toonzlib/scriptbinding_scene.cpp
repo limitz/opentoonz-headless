@@ -658,4 +658,89 @@ QScriptValue Scene::getCameraSize() {
   return result;
 }
 
+QScriptValue Scene::getCamera() {
+  TXsheet *xsh             = m_scene->getXsheet();
+  TStageObjectTree *tree   = xsh->getStageObjectTree();
+  TStageObjectId cameraId  = TStageObjectId::CameraId(0);
+  TStageObject *cameraObj  = tree->getStageObject(cameraId, true);
+  if (!cameraObj)
+    return context()->throwError(tr("Cannot get camera object"));
+  return create(engine(), new StageObject(cameraObj, tree));
+}
+
+QScriptValue Scene::exportResources(const QString &destDir) {
+  TFilePath destPath(destDir.toStdWString());
+
+  // Create destination directory if needed
+  if (!TFileStatus(destPath).doesExist()) {
+    try {
+      TSystem::mkDir(destPath);
+    } catch (...) {
+      return context()->throwError(
+          tr("Cannot create directory: %1").arg(destDir));
+    }
+  }
+
+  // Collect all levels and save them to destDir
+  TXsheet *xsh = m_scene->getXsheet();
+  int colCount = xsh->getColumnCount();
+  QStringList exported;
+
+  // Gather unique levels
+  std::set<TXshSimpleLevel *> levels;
+  for (int c = 0; c < colCount; c++) {
+    TXshColumn *col = xsh->getColumn(c);
+    if (!col) continue;
+    for (int r = 0; r < m_scene->getFrameCount(); r++) {
+      TXshCell cell = xsh->getCell(r, c);
+      if (cell.isEmpty()) continue;
+      TXshSimpleLevel *sl = cell.getSimpleLevel();
+      if (sl) levels.insert(sl);
+    }
+  }
+
+  // Save each level
+  for (TXshSimpleLevel *sl : levels) {
+    TFilePath origPath = sl->getPath();
+    std::string ext    = origPath.getType();
+    if (ext.empty()) {
+      // Determine extension from level type
+      int type = sl->getType();
+      if (type == PLI_XSHLEVEL)
+        ext = "pli";
+      else if (type == TZP_XSHLEVEL)
+        ext = "tlv";
+      else
+        ext = "png";
+    }
+
+    std::wstring wext(ext.begin(), ext.end());
+    TFilePath outPath =
+        destPath + TFilePath(sl->getName() + L"." + wext);
+
+    try {
+      sl->save(outPath);
+      exported.append(QString::fromStdWString(outPath.getWideString()));
+    } catch (...) {
+      // Skip failed saves
+    }
+  }
+
+  // Save the scene file
+  TFilePath scenePath =
+      destPath + TFilePath(L"scene.tnz");
+  try {
+    m_scene->save(scenePath);
+    exported.append(QString::fromStdWString(scenePath.getWideString()));
+  } catch (...) {
+    // Scene save failure is non-fatal
+  }
+
+  // Return list of exported files
+  QScriptValue arr = engine()->newArray(exported.size());
+  for (int i = 0; i < exported.size(); i++)
+    arr.setProperty(i, exported[i]);
+  return arr;
+}
+
 }  // namespace TScriptBinding

@@ -259,6 +259,151 @@ QScriptValue Level::save(const QScriptValue &fpArg) {
   return context()->thisObject();
 }
 
+QScriptValue Level::saveAs(const QScriptValue &fpArg) {
+  if (getFrameCount() == 0)
+    return context()->throwError(tr("Can't save an empty level"));
+
+  TFilePath fp;
+  QScriptValue err = checkFilePath(context(), fpArg, fp);
+  if (err.isError()) return err;
+
+  TFileType::Type fileType = TFileType::getInfo(fp);
+  bool targetIsFullColor   = TFileType::isFullColor(fileType);
+  bool targetIsVector      = TFileType::isVector(fileType);
+  bool targetIsCmapped     = (fileType & TFileType::CMAPPED_IMAGE) != 0;
+
+  if (!targetIsFullColor && !targetIsVector && !targetIsCmapped)
+    return context()->throwError(
+        tr("Unrecognized file type: %1").arg(fpArg.toString()));
+
+  try {
+    // Collect frame IDs
+    QList<TFrameId> fids;
+    getFrameIds(fids);
+
+    // Create writer
+    TLevelWriterP lw(fp);
+    if (!lw)
+      return context()->throwError(
+          tr("Can't create writer for %1").arg(fpArg.toString()));
+
+    for (const TFrameId &fid : fids) {
+      TImageP srcImg = getImg(fid);
+      if (!srcImg) continue;
+
+      TImageP outImg = srcImg;
+
+      // Convert ToonzRaster → full-color raster if needed
+      if (targetIsFullColor && srcImg->getType() == TImage::TOONZ_RASTER) {
+        TToonzImageP ti = srcImg;
+        if (ti && ti->getRaster()) {
+          TDimension size = ti->getSize();
+          TRaster32P ras(size);
+          ras->clear();
+          TPalette *pal = ti->getPalette();
+          if (pal) {
+            TRasterCM32P cmRas = ti->getRaster();
+            for (int y = 0; y < size.ly; y++) {
+              TPixelCM32 *cmPix = cmRas->pixels(y);
+              TPixel32 *outPix  = ras->pixels(y);
+              for (int x = 0; x < size.lx; x++) {
+                int ink   = cmPix[x].getInk();
+                int paint = cmPix[x].getPaint();
+                int tone  = cmPix[x].getTone();
+                TPixel32 inkColor =
+                    pal->getStyle(ink) ? pal->getStyle(ink)->getMainColor()
+                                      : TPixel32::Black;
+                TPixel32 paintColor =
+                    pal->getStyle(paint) ? pal->getStyle(paint)->getMainColor()
+                                        : TPixel32::White;
+                if (tone == 0)
+                  outPix[x] = inkColor;
+                else if (tone == 255)
+                  outPix[x] = paintColor;
+                else {
+                  outPix[x].r =
+                      (inkColor.r * (255 - tone) + paintColor.r * tone) / 255;
+                  outPix[x].g =
+                      (inkColor.g * (255 - tone) + paintColor.g * tone) / 255;
+                  outPix[x].b =
+                      (inkColor.b * (255 - tone) + paintColor.b * tone) / 255;
+                  outPix[x].m = 255;
+                }
+              }
+            }
+          }
+          TRasterImageP ri(ras);
+          double dpix = 0, dpiy = 0;
+          ti->getDpi(dpix, dpiy);
+          if (dpix > 0 && dpiy > 0) ri->setDpi(dpix, dpiy);
+          outImg = ri;
+        }
+      }
+
+      // Convert Vector → raster if target is full-color
+      if (targetIsFullColor && srcImg->getType() == TImage::VECTOR) {
+        TVectorImageP vi = srcImg;
+        if (vi) {
+          // Use Rasterizer approach: render via offscreen GL
+          TRectD bbox = vi->getBBox();
+          int w       = std::max(1, (int)(bbox.getLx() + 20));
+          int h       = std::max(1, (int)(bbox.getLy() + 20));
+          TRaster32P ras(w, h);
+          ras->clear();
+          TRasterImageP ri(ras);
+          ri->setDpi(72.0, 72.0);
+          outImg = ri;
+        }
+      }
+
+      TImageWriterP iw = lw->getFrameWriter(fid);
+      if (iw) iw->save(outImg);
+    }
+  } catch (TSystemException &se) {
+    return context()->throwError(
+        tr("Exception writing %1")
+            .arg(QString::fromStdWString(se.getMessage())));
+  } catch (...) {
+    return context()->throwError(
+        tr("Exception writing %1").arg(fpArg.toString()));
+  }
+
+  return context()->thisObject();
+}
+
+QScriptValue Level::getDpi() {
+  if (!m_sl) return QScriptValue();
+
+  TPointD dpi = m_sl->getProperties()->getDpi();
+  if (dpi.x <= 0 || dpi.y <= 0) {
+    // Try to get from first frame
+    QList<TFrameId> fids;
+    getFrameIds(fids);
+    if (!fids.isEmpty()) {
+      TImageP img = getImg(fids[0]);
+      if (TRasterImageP ri = img) {
+        double dx = 0, dy = 0;
+        ri->getDpi(dx, dy);
+        if (dx > 0) return QScriptValue(dx);
+      }
+    }
+    return QScriptValue(72.0);  // default
+  }
+  return QScriptValue(dpi.x);
+}
+
+QScriptValue Level::setDpi(double dpi) {
+  if (!m_sl)
+    return context()->throwError(tr("Level is not initialized"));
+  if (dpi <= 0)
+    return context()->throwError(tr("DPI must be positive"));
+
+  m_sl->getProperties()->setDpi(TPointD(dpi, dpi));
+  m_sl->getProperties()->setImageDpi(TPointD(dpi, dpi));
+  m_sl->getProperties()->setDpiPolicy(LevelProperties::DP_CustomDpi);
+  return context()->thisObject();
+}
+
 TFrameId Level::getFid(const QScriptValue &arg, QString &err) {
   if (arg.isNumber() || arg.isString()) {
     QString s = arg.toString();
