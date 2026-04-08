@@ -321,6 +321,158 @@ QScriptValue Scene::connectEffect(int colIdx, const QScriptValue &effectArg) {
   return context()->thisObject();
 }
 
+QScriptValue Scene::chainEffects(const QScriptValue &upstreamArg,
+                                 const QScriptValue &downstreamArg) {
+  Effect *upstream = nullptr;
+  QScriptValue err = checkEffect(context(), upstreamArg, upstream);
+  if (err.isError()) return err;
+
+  Effect *downstream = nullptr;
+  err = checkEffect(context(), downstreamArg, downstream);
+  if (err.isError()) return err;
+
+  TFxP upFx   = upstream->getFx();
+  TFxP downFx = downstream->getFx();
+  if (!upFx) return context()->throwError(tr("Upstream effect is null"));
+  if (!downFx) return context()->throwError(tr("Downstream effect is null"));
+
+  if (downFx->getInputPortCount() < 1)
+    return context()->throwError(
+        tr("Downstream effect '%1' has no input ports")
+            .arg(QString::fromStdString(downFx->getFxType())));
+
+  TXsheet *xsh = m_scene->getXsheet();
+  FxDag *fxDag = xsh->getFxDag();
+
+  // Register both in DAG if not already
+  if (!fxDag->getInternalFxs()->containsFx(upFx.getPointer())) {
+    fxDag->assignUniqueId(upFx.getPointer());
+    fxDag->getInternalFxs()->addFx(upFx.getPointer());
+  }
+  if (!fxDag->getInternalFxs()->containsFx(downFx.getPointer())) {
+    fxDag->assignUniqueId(downFx.getPointer());
+    fxDag->getInternalFxs()->addFx(downFx.getPointer());
+  }
+
+  // Wire upstream -> downstream's first input port
+  downFx->getInputPort(0)->setFx(upFx.getPointer());
+
+  return context()->thisObject();
+}
+
+QScriptValue Scene::connectBlend(int colA, int colB,
+                                 const QScriptValue &blendArg) {
+  Effect *blendEff = nullptr;
+  QScriptValue err = checkEffect(context(), blendArg, blendEff);
+  if (err.isError()) return err;
+
+  TFxP blendFx = blendEff->getFx();
+  if (!blendFx) return context()->throwError(tr("Blend effect is null"));
+
+  if (blendFx->getInputPortCount() < 2)
+    return context()->throwError(
+        tr("Blend effect '%1' needs at least 2 input ports, has %2")
+            .arg(QString::fromStdString(blendFx->getFxType()))
+            .arg(blendFx->getInputPortCount()));
+
+  TXsheet *xsh = m_scene->getXsheet();
+  if (colA < 0 || colA >= xsh->getColumnCount() || colB < 0 ||
+      colB >= xsh->getColumnCount())
+    return context()->throwError(tr("Column index out of range"));
+
+  TFx *fxA = xsh->getColumn(colA) ? xsh->getColumn(colA)->getFx() : nullptr;
+  TFx *fxB = xsh->getColumn(colB) ? xsh->getColumn(colB)->getFx() : nullptr;
+  if (!fxA) return context()->throwError(tr("Column %1 has no FX").arg(colA));
+  if (!fxB) return context()->throwError(tr("Column %1 has no FX").arg(colB));
+
+  FxDag *fxDag = xsh->getFxDag();
+
+  // Register blend in DAG
+  if (!fxDag->getInternalFxs()->containsFx(blendFx.getPointer())) {
+    fxDag->assignUniqueId(blendFx.getPointer());
+    fxDag->getInternalFxs()->addFx(blendFx.getPointer());
+  }
+
+  // Wire: colA -> port 0 ("Source" / "Back" / first port)
+  //        colB -> port 1 ("Up" / second port)
+  blendFx->getInputPort(0)->setFx(fxA);
+  blendFx->getInputPort(1)->setFx(fxB);
+
+  // Remove both columns from xsheet output, add blend
+  fxDag->removeFromXsheet(fxA);
+  fxDag->removeFromXsheet(fxB);
+  fxDag->addToXsheet(blendFx.getPointer());
+
+  return context()->thisObject();
+}
+
+QScriptValue Scene::disconnectEffect(const QScriptValue &effectArg) {
+  Effect *eff = nullptr;
+  QScriptValue err = checkEffect(context(), effectArg, eff);
+  if (err.isError()) return err;
+
+  TFxP fx = eff->getFx();
+  if (!fx) return context()->throwError(tr("Effect is null"));
+
+  TXsheet *xsh = m_scene->getXsheet();
+  FxDag *fxDag = xsh->getFxDag();
+
+  // Find what's connected to this effect's first input port
+  TFx *upstreamFx = nullptr;
+  if (fx->getInputPortCount() > 0) {
+    TFxPort *port = fx->getInputPort(0);
+    if (port) upstreamFx = port->getFx();
+  }
+
+  // If this effect is a terminal (connected to xsheet output), reconnect
+  // upstream to xsheet output instead
+  bool wasTerminal = fxDag->getTerminalFxs()->containsFx(fx.getPointer());
+  if (wasTerminal) {
+    fxDag->removeFromXsheet(fx.getPointer());
+    if (upstreamFx) fxDag->addToXsheet(upstreamFx);
+  }
+
+  // Disconnect all input ports
+  for (int i = 0; i < fx->getInputPortCount(); i++) {
+    TFxPort *port = fx->getInputPort(i);
+    if (port) port->setFx(nullptr);
+  }
+
+  // Remove from internal FX set
+  fxDag->getInternalFxs()->removeFx(fx.getPointer());
+
+  return context()->thisObject();
+}
+
+QScriptValue Scene::getColumnEffect(int colIdx) {
+  TXsheet *xsh = m_scene->getXsheet();
+  if (colIdx < 0 || colIdx >= xsh->getColumnCount())
+    return context()->throwError(
+        tr("Column index %1 out of range").arg(colIdx));
+
+  TXshColumn *col = xsh->getColumn(colIdx);
+  if (!col || !col->getFx()) return QScriptValue();
+
+  TFx *columnFx = col->getFx();
+  FxDag *fxDag  = xsh->getFxDag();
+
+  // Walk the FxDag to find any effect connected to this column's output.
+  // Check all internal FX: if any has this column as input on port 0,
+  // that's the column's effect.
+  std::set<TFx *> allFxs;
+  fxDag->getInternalFxs()->getFxs(allFxs);
+  for (TFx *fx : allFxs) {
+    for (int i = 0; i < fx->getInputPortCount(); i++) {
+      TFxPort *port = fx->getInputPort(i);
+      if (port && port->getFx() == columnFx) {
+        return create(engine(), new Effect(TFxP(fx)));
+      }
+    }
+  }
+
+  return QScriptValue();  // No effect found
+}
+
 QScriptValue Scene::setFrameRate(double fps) {
   if (fps <= 0) {
     return context()->throwError(tr("Frame rate must be positive"));

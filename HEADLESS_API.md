@@ -771,6 +771,299 @@ img.save("/tmp/plastic_deform.png");
 
 ---
 
+## Compositing/FX (Extended)
+
+The FX graph can now be manipulated beyond single-column effects.
+
+### Effect Port Introspection
+
+```javascript
+var fx = new Effect("STD_blurFx");
+fx.inputPortCount;              // Number of input ports (1 for most filters)
+fx.getInputPortName(0);         // Name of port 0 (e.g., "Source")
+
+// Wire another effect to a specific input port
+fx.connectInput(0, otherEffect);           // By index
+fx.connectInput("Source", otherEffect);    // By name
+fx.connectInput(0, null);                  // Disconnect
+```
+
+### Effect Chaining
+
+Chain multiple effects on a single column:
+
+```javascript
+var scene = new Scene();
+// ... create level, set cells ...
+
+var blur = new Effect("STD_blurFx");
+blur.setParam("value", 5);
+var glow = new Effect("STD_glowFx");
+glow.setParam("value", 10);
+
+// Connect column 0 -> blur -> glow -> output
+scene.connectEffect(0, blur);    // column -> blur (existing API)
+scene.chainEffects(blur, glow);  // blur -> glow's first input port
+```
+
+### Blend Effects (Two-Column Compositing)
+
+Blend two columns using any 2-input effect (over, multiply, add, etc.):
+
+```javascript
+// Create two columns with content
+scene.setCell(0, 0, bgLevel, 1);
+scene.setCell(0, 1, fgLevel, 1);
+
+// Blend them
+var blend = new Effect("STD_inoOverFx");  // Porter-Duff over
+scene.connectBlend(0, 1, blend);          // col0 -> port0, col1 -> port1
+
+// Other blend modes:
+// "STD_inoAddFx", "STD_inoMultiplyFx", "STD_inoScreenFx",
+// "STD_inoOverlayFx", "STD_inoCrossDissFx", etc.
+```
+
+### Disconnect and Query Effects
+
+```javascript
+scene.disconnectEffect(blur);    // Remove effect, reconnect upstream to output
+var fx = scene.getColumnEffect(0); // Get effect connected to column 0 (or null)
+```
+
+---
+
+## Rendering/Output (Extended)
+
+### Renderer Properties
+
+```javascript
+var renderer = new Renderer();
+
+// Resample quality (filter for affine transforms)
+renderer.quality = "lanczos3";  // Options: "standard", "improved", "high",
+                                // "triangle", "mitchell", "cubic5", "cubic75",
+                                // "cubic1", "lanczos2", "lanczos3", "hann2",
+                                // "hann3", "hamming2", "hamming3", "gauss",
+                                // "closestPixel", "bilinear"
+
+// Channel depth
+renderer.channelWidth = 8;      // 8 (default) or 16 bits per channel
+
+// Thread count
+renderer.threadCount = 4;       // Number of render threads (default: 1)
+```
+
+### Render to File
+
+Render a frame range directly to disk. Format determined by file extension.
+
+```javascript
+// Render frames 0-23 to PNG sequence
+renderer.renderToFile(scene, "/output/anim..png", 0, 23, 1);
+
+// Render every 2nd frame to TIF
+renderer.renderToFile(scene, "/output/anim..tif", 0, 47, 2);
+
+// Render single frame
+renderer.renderToFile(scene, "/output/frame..png", 5, 5, 1);
+```
+
+**Supported formats:** PNG, TIF, TGA, JPG, BMP (image sequences). Format extensions with codec support (MOV, MP4) depend on system FFmpeg availability.
+
+**Note:** The double-dot `..` in filenames is OpenToonz convention for frame number insertion (e.g., `anim..png` becomes `anim.0001.png`, `anim.0002.png`, etc.)
+
+---
+
+## Cleanupper
+
+Process scanned or raster artwork into clean digital levels. Converts full-color raster images to ToonzRaster (indexed colormap) format with line processing, despeckling, and tonal normalization.
+
+```javascript
+var cl = new Cleanupper();
+
+// Line processing mode
+cl.lineProcessing = "greyscale";  // "none", "greyscale", "color"
+
+// Sharpness and despeckling
+cl.sharpness = 90;       // 0-100 (higher = sharper, default 90)
+cl.despeckling = 2;      // 0-20 (speckle removal threshold, default 2)
+
+// Antialiasing
+cl.antialias = "standard";    // "standard", "none", "morphological"
+cl.aaIntensity = 70;          // 0-100 (morphological AA intensity, default 70)
+
+// Auto-adjust (greyscale mode only)
+cl.autoAdjust = "none";  // "none", "blackEq", "histogram", "histoL"
+
+// Geometric transforms
+cl.rotate = 0;           // 0, 90, 180, 270
+cl.flipX = false;
+cl.flipY = false;
+
+// Process a single image (Raster or ToonzRaster input -> ToonzRaster output)
+var cleaned = cl.process(rasterImage);
+
+// Process all frames in a level
+var cleanedLevel = cl.processLevel(rasterLevel);
+```
+
+**Auto-adjust modes:**
+- `"blackEq"` -- Edge-based black equalization (normalizes ink darkness)
+- `"histogram"` -- Cumulative histogram matching (first frame = reference)
+- `"histoL"` -- Line-width distribution matching
+
+**Note:** When processing a level with `processLevel()`, the first frame becomes the reference for auto-adjust algorithms. Subsequent frames are matched to the first frame's tonal distribution.
+
+---
+
+## Tracker
+
+Track object movement across frames using Variable Mean-Shift algorithm with Interpolated Template Matching.
+
+```javascript
+var tracker = new Tracker();
+
+// Configuration
+tracker.threshold = 0.2;        // 0-1: confidence threshold to mark object as lost (default 0.2)
+tracker.sensitivity = 0.01;     // 0-1: template matching acceptance threshold (default 0.01)
+tracker.variableRegion = false; // adaptive tracking box size
+tracker.includeBackground = false; // background-aware tracking
+
+// Define tracking regions (x, y, width, height in pixel coordinates)
+// Returns region index
+var regionIdx = tracker.addRegion(100, 50, 40, 40);  // Track a 40x40 region at (100,50)
+tracker.addRegion(200, 80, 30, 30);                   // Track a second region
+
+// Track across frames in a level
+// Returns array of per-region results
+var results = tracker.track(level, 1, 24);  // track from frame 1 to 24
+
+// Access results
+for (var i = 0; i < results.length; i++) {
+    var region = results[i];
+    print("Region " + i + ":");
+    for (var f = 0; f < region.x.length; f++) {
+        print("  frame " + f + ": x=" + region.x[f] + " y=" + region.y[f]
+              + " status=" + region.status[f]);
+    }
+}
+```
+
+**Result structure:** Array of objects, one per tracked region:
+```javascript
+[{
+    x: [x0, x1, x2, ...],         // X position per frame
+    y: [y0, y1, y2, ...],         // Y position per frame
+    status: ["VISIBLE", "VISIBLE", "WARNING", ...]  // Tracking status per frame
+}, ...]
+```
+
+**Status values:** `"VISIBLE"` (good track), `"WARNING"` (uncertain), `"INVISIBLE"` (lost)
+
+**Applying results to keyframes:**
+```javascript
+// Track object motion
+var results = tracker.track(level, 1, 24);
+
+// Apply tracked X/Y to a stage object
+var obj = scene.getStageObject(0);
+for (var f = 0; f < results[0].x.length; f++) {
+    obj.setKeyframe(f, "x", results[0].x[f]);
+    obj.setKeyframe(f, "y", results[0].y[f]);
+}
+```
+
+---
+
+### CenterlineVectorizer
+
+Convert raster images to vector by extracting the medial axis skeleton of brushstrokes. Output strokes have variable thickness encoding the original stroke width.
+
+```javascript
+var cv = new CenterlineVectorizer();
+
+// Configuration (all optional, defaults shown)
+cv.threshold = 8;              // 0-8: ink/paper distinction
+cv.accuracy = 7;               // 1-10: fidelity vs. simplicity
+cv.despeckling = 5;             // 0-100: noise removal (min region area)
+cv.maxThickness = 200;          // 0-200+: max stroke thickness (0 = outline only)
+cv.thicknessCalibration = 100;  // 0-200: post-processing thickness scale (%)
+cv.preservePaintedAreas = true; // compute fill regions
+cv.addBorder = false;           // add transparent frame border
+cv.eir = false;                 // enhanced ink recognition for full-color sources
+
+// Vectorize a single image (returns vector Image)
+var vectorImg = cv.vectorize(rasterImage);
+
+// Vectorize an entire level (returns Level with all frames vectorized)
+var vectorLevel = cv.vectorize(rasterLevel);
+```
+
+**Input:** Raster or ToonzRaster Image/Level
+**Output:** Vector Image/Level
+
+---
+
+### OutlineVectorizer
+
+Convert raster images to vector by tracing contour boundaries. Output strokes are uniform-thickness outlines.
+
+```javascript
+var ov = new OutlineVectorizer();
+
+// Configuration (all optional, defaults shown)
+ov.accuracy = 7;               // 0-10: curve simplification vs. fidelity
+ov.despeckling = 4;             // 0-200+: edge despeckling (pixels)
+ov.preservePaintedAreas = true; // compute fill regions
+ov.cornerAdherence = 50;       // 0-100: contour corner following
+ov.cornerAngle = 45;           // 0-180: angle-based corner detection (degrees)
+ov.cornerCurveRadius = 25;     // 0-100: curvature-based corner detection
+ov.maxColors = 50;             // 1-256: color quantization limit (fullcolor input)
+ov.transparentColor = "#ffffff"; // color recognized as transparent
+ov.toneThreshold = 128;        // 0-255: tone threshold for TLV input
+
+// Vectorize a single image (returns vector Image)
+var vectorImg = ov.vectorize(rasterImage);
+
+// Vectorize an entire level (returns Level with all frames vectorized)
+var vectorLevel = ov.vectorize(rasterLevel);
+```
+
+**Input:** Raster or ToonzRaster Image/Level
+**Output:** Vector Image/Level
+
+---
+
+### Vectorization Example
+
+```javascript
+// Create a raster drawing to vectorize
+var rc = new RasterCanvas(256, 256);
+var pal = new Palette();
+var ink = pal.addColor(0, 0, 0, 255);
+rc.setPalette(pal);
+rc.brushStroke([[60,128,4],[128,200,4],[196,128,4]], ink, true);
+rc.brushStroke([[128,200,4],[128,60,4]], ink, true);
+var rasterImg = rc.toImage();
+
+// Centerline vectorization
+var cv = new CenterlineVectorizer();
+cv.accuracy = 9;
+cv.maxThickness = 100;
+var vectorImg = cv.vectorize(rasterImg);
+vectorImg.save("/tmp/vectorized_centerline.pli");
+
+// Outline vectorization
+var ov = new OutlineVectorizer();
+ov.accuracy = 8;
+ov.cornerAngle = 60;
+var vectorImg2 = ov.vectorize(rasterImg);
+vectorImg2.save("/tmp/vectorized_outline.pli");
+```
+
+---
+
 ## Binary Location and Build
 
 ```

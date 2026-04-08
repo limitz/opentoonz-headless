@@ -21,6 +21,21 @@ public:
 
   Q_INVOKABLE QScriptValue renderScene(const QScriptValue &scene);
   Q_INVOKABLE QScriptValue renderFrame(const QScriptValue &scene, int frame);
+  Q_INVOKABLE QScriptValue renderToFile(const QScriptValue &sceneArg,
+                                        const QString &path, int from, int to,
+                                        int step);
+
+  Q_PROPERTY(QString quality READ getQuality WRITE setQuality)
+  QString getQuality() const;
+  void setQuality(const QString &q);
+
+  Q_PROPERTY(int channelWidth READ getChannelWidth WRITE setChannelWidth)
+  int getChannelWidth() const;
+  void setChannelWidth(int bpc);
+
+  Q_PROPERTY(int threadCount READ getThreadCount WRITE setThreadCount)
+  int getThreadCount() const;
+  void setThreadCount(int n);
 
   Q_INVOKABLE void dumpCache();
 };

@@ -1838,6 +1838,317 @@ def test_missing_features():
 #  MAIN
 # ============================================================
 
+def test_vectorization():
+    G = "Vectorization"
+
+    # CenterlineVectorizer: create and check defaults
+    test("CenterlineVectorizer create", [
+        'var cv = new CenterlineVectorizer(); print(cv.toString())',
+    ], lambda r: ("Centerline" in output_of(r), f"got={output_of(r)}"), group=G)
+
+    # CenterlineVectorizer: property get/set
+    test("CenterlineVectorizer properties", [
+        'var cv = new CenterlineVectorizer();'
+        'cv.threshold = 5; cv.accuracy = 9; cv.despeckling = 20; cv.maxThickness = 100;'
+        'cv.thicknessCalibration = 80; cv.preservePaintedAreas = false;'
+        'cv.addBorder = true; cv.eir = true;'
+        'print(cv.threshold + "," + cv.accuracy + "," + cv.despeckling + "," + cv.maxThickness + ","'
+        '+ cv.thicknessCalibration + "," + cv.preservePaintedAreas + "," + cv.addBorder + "," + cv.eir)',
+    ], lambda r: (output_of(r) == "5,9,20,100,80,false,true,true", f"got={output_of(r)}"), group=G)
+
+    # OutlineVectorizer: create
+    test("OutlineVectorizer create", [
+        'var ov = new OutlineVectorizer(); print(ov.toString())',
+    ], lambda r: ("Outline" in output_of(r), f"got={output_of(r)}"), group=G)
+
+    # OutlineVectorizer: property get/set
+    test("OutlineVectorizer properties", [
+        'var ov = new OutlineVectorizer();'
+        'ov.accuracy = 8; ov.despeckling = 10; ov.preservePaintedAreas = false;'
+        'ov.cornerAdherence = 70; ov.cornerAngle = 90; ov.cornerCurveRadius = 40;'
+        'ov.maxColors = 25; ov.toneThreshold = 100;'
+        'print(ov.accuracy + "," + ov.despeckling + "," + ov.preservePaintedAreas + ","'
+        '+ ov.cornerAdherence + "," + ov.cornerAngle + "," + ov.cornerCurveRadius + ","'
+        '+ ov.maxColors + "," + ov.toneThreshold)',
+    ], lambda r: (output_of(r) == "8,10,false,70,90,40,25,100", f"got={output_of(r)}"), group=G)
+
+    # CenterlineVectorizer: vectorize a raster image
+    test("CenterlineVectorizer vectorize image", [
+        'var rc = new RasterCanvas(128, 128);'
+        'var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        'rc.setPalette(pal);'
+        'rc.brushStroke([[30,64,4],[64,100,4],[98,64,4]], ink, true);'
+        'var img = rc.toImage();',
+        'var cv = new CenterlineVectorizer();'
+        'cv.accuracy = 7; cv.maxThickness = 100;'
+        'var vimg = cv.vectorize(img);'
+        'print(vimg.type)',
+    ], lambda r: (output_of(r, 1) == "Vector", f"type={output_of(r, 1)}"), group=G)
+
+    # OutlineVectorizer: vectorize a raster image
+    test("OutlineVectorizer vectorize image", [
+        'var rc = new RasterCanvas(128, 128);'
+        'var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        'rc.setPalette(pal);'
+        'rc.brushStroke([[30,64,4],[64,100,4],[98,64,4]], ink, true);'
+        'var img = rc.toImage();',
+        'var ov = new OutlineVectorizer();'
+        'ov.accuracy = 7;'
+        'var vimg = ov.vectorize(img);'
+        'print(vimg.type)',
+    ], lambda r: (output_of(r, 1) == "Vector", f"type={output_of(r, 1)}"), group=G)
+
+    # Vectorize a multi-frame level
+    test("CenterlineVectorizer vectorize level", [
+        'var rc1 = new RasterCanvas(64, 64);'
+        'var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        'rc1.setPalette(pal);'
+        'rc1.brushStroke([[10,32,3],[54,32,3]], ink, true);'
+        'var rc2 = new RasterCanvas(64, 64);'
+        'rc2.setPalette(pal);'
+        'rc2.brushStroke([[32,10,3],[32,54,3]], ink, true);'
+        'var lv = new Level(); lv.setFrame(1, rc1.toImage()); lv.setFrame(2, rc2.toImage());',
+        'var cv = new CenterlineVectorizer(); cv.accuracy = 7;'
+        'var vlv = cv.vectorize(lv);'
+        'print(vlv.frameCount)',
+    ], lambda r: (output_of(r, 1) == "2", f"frameCount={output_of(r, 1)}"), group=G)
+
+
+def test_compositing():
+    G = "Compositing/FX"
+
+    # Effect: port introspection
+    test("Effect input port count", [
+        'var fx = new Effect("STD_blurFx");'
+        'print(fx.inputPortCount)',
+    ], lambda r: (output_of(r) == "1", f"ports={output_of(r)}"), group=G)
+
+    test("Effect input port name", [
+        'var fx = new Effect("STD_blurFx");'
+        'print(fx.getInputPortName(0))',
+    ], lambda r: (len(output_of(r)) > 0 and not has_error(r), f"name={output_of(r)}"), group=G)
+
+    test("Blend effect has 2 ports", [
+        'var fx = new Effect("STD_inoOverFx");'
+        'print(fx.inputPortCount)',
+    ], lambda r: (output_of(r) == "2", f"ports={output_of(r)}"), group=G)
+
+    # chainEffects: blur -> glow on a column
+    test("Chain effects (blur -> glow)", [
+        'var scene = new Scene(); scene.setCameraSize(64, 64);'
+        'var lv = scene.newLevel("Vector", "test");'
+        'var pal = new Palette(); var ink = pal.addColor(255, 0, 0, 255);'
+        'var vi = new VectorImage(); vi.addCircle(0, 0, 20, 2, ink); vi.setPalette(pal);'
+        'lv.setFrame(1, vi.toImage()); scene.setCell(0, 0, lv, 1);',
+        'var blur = new Effect("STD_blurFx"); blur.setParam("value", 3);'
+        'var glow = new Effect("STD_glowFx"); glow.setParam("value", 5);'
+        'scene.connectEffect(0, blur);'
+        'scene.chainEffects(blur, glow);',
+        'var renderer = new Renderer();'
+        'var img = renderer.renderFrame(scene, 0);'
+        'print(img.type)',
+    ], lambda r: (output_of(r, 2) == "Raster" and not has_error(r, 1), f"type={output_of(r, 2)}, err={has_error(r, 1)}"), group=G)
+
+    # connectBlend: blend two columns
+    test("Connect blend (two columns)", [
+        'var scene = new Scene(); scene.setCameraSize(64, 64);'
+        'var lv1 = scene.newLevel("Vector", "bg");'
+        'var lv2 = scene.newLevel("Vector", "fg");'
+        'var pal = new Palette();'
+        'var red = pal.addColor(255, 0, 0, 255);'
+        'var blue = pal.addColor(0, 0, 255, 255);'
+        'var vi1 = new VectorImage(); vi1.addCircle(-10, 0, 25, 2, red); vi1.setPalette(pal);'
+        'var vi2 = new VectorImage(); vi2.addCircle(10, 0, 25, 2, blue); vi2.setPalette(pal);'
+        'lv1.setFrame(1, vi1.toImage()); lv2.setFrame(1, vi2.toImage());'
+        'scene.setCell(0, 0, lv1, 1); scene.setCell(0, 1, lv2, 1);',
+        'var blend = new Effect("STD_inoOverFx");'
+        'scene.connectBlend(0, 1, blend);',
+        'var renderer = new Renderer();'
+        'var img = renderer.renderFrame(scene, 0);'
+        'print(img.type)',
+    ], lambda r: (output_of(r, 2) == "Raster" and not has_error(r, 1), f"type={output_of(r, 2)}, blendErr={has_error(r, 1)}"), group=G)
+
+    # disconnectEffect
+    test("Disconnect effect", [
+        'var scene = new Scene(); scene.setCameraSize(64, 64);'
+        'var lv = scene.newLevel("Vector", "test");'
+        'var pal = new Palette(); var ink = pal.addColor(0, 0, 0, 255);'
+        'var vi = new VectorImage(); vi.addCircle(0, 0, 20, 2, ink); vi.setPalette(pal);'
+        'lv.setFrame(1, vi.toImage()); scene.setCell(0, 0, lv, 1);',
+        'var blur = new Effect("STD_blurFx"); blur.setParam("value", 3);'
+        'scene.connectEffect(0, blur);',
+        'scene.disconnectEffect(blur);'
+        'var renderer = new Renderer();'
+        'var img = renderer.renderFrame(scene, 0);'
+        'print(img.type)',
+    ], lambda r: (output_of(r, 2) == "Raster" and not has_error(r, 2), f"type={output_of(r, 2)}"), group=G)
+
+    # getColumnEffect
+    test("Get column effect", [
+        'var scene = new Scene(); scene.setCameraSize(64, 64);'
+        'var lv = scene.newLevel("Vector", "test");'
+        'var pal = new Palette(); var ink = pal.addColor(0, 0, 0, 255);'
+        'var vi = new VectorImage(); vi.addCircle(0, 0, 20, 2, ink); vi.setPalette(pal);'
+        'lv.setFrame(1, vi.toImage()); scene.setCell(0, 0, lv, 1);',
+        'var blur = new Effect("STD_blurFx");'
+        'scene.connectEffect(0, blur);'
+        'var fx = scene.getColumnEffect(0);'
+        'print(fx.type)',
+    ], lambda r: ("blur" in output_of(r, 1).lower(), f"type={output_of(r, 1)}"), group=G)
+
+    # Effect.connectInput
+    test("Effect.connectInput by index", [
+        'var fx1 = new Effect("STD_blurFx");'
+        'var fx2 = new Effect("STD_blurFx");'
+        'fx2.connectInput(0, fx1);'
+        'print(fx2.inputPortCount + "," + fx2.getInputPortName(0))',
+    ], lambda r: ("1,Source" in output_of(r) and not has_error(r), f"got={output_of(r)}"), group=G)
+
+
+def test_rendering_output():
+    G = "Rendering/Output"
+
+    # Renderer quality property
+    test("Renderer quality property", [
+        'var r = new Renderer(); r.quality = "lanczos3"; print(r.quality)',
+    ], lambda r: (output_of(r) == "lanczos3", f"got={output_of(r)}"), group=G)
+
+    # Renderer channelWidth property
+    test("Renderer channelWidth property", [
+        'var r = new Renderer(); r.channelWidth = 16; print(r.channelWidth)',
+    ], lambda r: (output_of(r) == "16", f"got={output_of(r)}"), group=G)
+
+    # Renderer threadCount property
+    test("Renderer threadCount property", [
+        'var r = new Renderer(); r.threadCount = 2; print(r.threadCount)',
+    ], lambda r: (output_of(r) == "2", f"got={output_of(r)}"), group=G)
+
+    # renderToFile: PNG sequence
+    test("renderToFile PNG sequence", [
+        'var scene = new Scene(); scene.setCameraSize(32, 32);'
+        'var lv = scene.newLevel("Vector", "ball");'
+        'var pal = new Palette(); var ink = pal.addColor(255, 0, 0, 255);'
+        'var vi = new VectorImage(); vi.addCircle(0, 0, 10, 2, ink); vi.setPalette(pal);'
+        'lv.setFrame(1, vi.toImage());'
+        'for (var f = 0; f < 3; f++) scene.setCell(f, 0, lv, 1);',
+        'var renderer = new Renderer(); renderer.quality = "standard";'
+        f'renderer.renderToFile(scene, "{TESTDIR}/test_renderToFile..png", 0, 2, 1);'
+        'print("done")',
+    ], lambda r: (output_of(r, 1) == "done" and
+                  file_exists_and_nonzero(os.path.join(TESTDIR, "test_renderToFile.0001.png")),
+                  f"out={output_of(r, 1)}"), group=G)
+
+    # renderToFile: TIF sequence with step
+    test("renderToFile TIF with step", [
+        'var scene = new Scene(); scene.setCameraSize(32, 32);'
+        'var lv = scene.newLevel("Vector", "ball");'
+        'var pal = new Palette(); var ink = pal.addColor(0, 0, 255, 255);'
+        'var vi = new VectorImage(); vi.addCircle(0, 0, 10, 2, ink); vi.setPalette(pal);'
+        'lv.setFrame(1, vi.toImage());'
+        'for (var f = 0; f < 6; f++) scene.setCell(f, 0, lv, 1);',
+        'var renderer = new Renderer();'
+        f'renderer.renderToFile(scene, "{TESTDIR}/test_renderStep..tif", 0, 4, 2);'
+        'print("done")',
+    ], lambda r: (output_of(r, 1) == "done",
+                  f"out={output_of(r, 1)}"), group=G)
+
+
+def test_tracker():
+    G = "Tracking"
+
+    # Tracker creation
+    test("Tracker create", [
+        'var t = new Tracker(); print(t.toString())',
+    ], lambda r: ("Tracker" in output_of(r), f"got={output_of(r)}"), group=G)
+
+    # Tracker properties
+    test("Tracker properties", [
+        'var t = new Tracker(); t.threshold = 0.3; t.sensitivity = 0.05;'
+        't.variableRegion = true; t.includeBackground = true;'
+        'print(t.threshold + "," + t.sensitivity + "," + t.variableRegion + "," + t.includeBackground)',
+    ], lambda r: (output_of(r) == "0.3,0.05,true,true", f"got={output_of(r)}"), group=G)
+
+    # addRegion
+    test("Tracker addRegion", [
+        'var t = new Tracker();'
+        'var r0 = t.addRegion(50, 50, 30, 30);'
+        'var r1 = t.addRegion(100, 100, 20, 20);'
+        'print(r0 + "," + r1)',
+    ], lambda r: (output_of(r) == "0,1", f"got={output_of(r)}"), group=G)
+
+    # Track a level (basic functional test)
+    test("Tracker track level", [
+        'var lv = new Level();'
+        'for (var f = 0; f < 3; f++) {'
+        '  var rc = new RasterCanvas(128, 128);'
+        '  var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        '  rc.setPalette(pal);'
+        '  var cx = 40 + f * 20;'
+        '  rc.brushStroke([[cx-5,64,5],[cx+5,64,5]], ink, true);'
+        '  lv.setFrame(f+1, rc.toImage());'
+        '}',
+        'var t = new Tracker(); t.threshold = 0.5; t.sensitivity = 0.1;'
+        't.addRegion(40, 64, 20, 20);'
+        'var results = t.track(lv, 1, 3);'
+        'print(results.length + "," + results[0].x.length + "," + results[0].status[0])',
+    ], lambda r: (output_of(r, 1) == "1,3,VISIBLE", f"got={output_of(r, 1)}"), group=G)
+
+    # Error: no regions
+    test("Tracker error: no regions", [
+        'var t = new Tracker();'
+        'var lv = new Level();'
+        'var rc = new RasterCanvas(64, 64);'
+        'var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        'rc.setPalette(pal); rc.brushStroke([[10,32,3],[54,32,3]], ink, true);'
+        'lv.setFrame(1, rc.toImage());'
+        'var r = t.track(lv, 1, 1); print(r)',
+    ], lambda r: (has_error(r), "should error with no regions"), group=G)
+
+
+def test_cleanupper():
+    G = "Cleanup"
+
+    # Cleanupper creation
+    test("Cleanupper create", [
+        'var cl = new Cleanupper(); print(cl.toString())',
+    ], lambda r: ("Cleanupper" in output_of(r), f"got={output_of(r)}"), group=G)
+
+    # Cleanupper properties
+    test("Cleanupper properties", [
+        'var cl = new Cleanupper();'
+        'cl.lineProcessing = "greyscale"; cl.sharpness = 80; cl.despeckling = 5;'
+        'cl.antialias = "morphological"; cl.aaIntensity = 50;'
+        'cl.autoAdjust = "histogram"; cl.rotate = 90; cl.flipX = true; cl.flipY = true;'
+        'print(cl.lineProcessing + "," + cl.sharpness + "," + cl.despeckling + ","'
+        '+ cl.antialias + "," + cl.aaIntensity + "," + cl.autoAdjust + ","'
+        '+ cl.rotate + "," + cl.flipX + "," + cl.flipY)',
+    ], lambda r: (output_of(r) == "greyscale,80,5,morphological,50,histogram,90,true,true",
+                  f"got={output_of(r)}"), group=G)
+
+    # Cleanupper process ToonzRaster
+    test("Cleanupper process ToonzRaster", [
+        'var rc = new RasterCanvas(128, 128);'
+        'var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        'rc.setPalette(pal);'
+        'rc.brushStroke([[30,64,4],[64,100,4],[98,64,4]], ink, true);'
+        'var img = rc.toImage();',
+        'var cl = new Cleanupper(); cl.lineProcessing = "greyscale";'
+        'var cleaned = cl.process(img); print(cleaned.type)',
+    ], lambda r: (output_of(r, 1) == "ToonzRaster", f"type={output_of(r, 1)}"), group=G)
+
+    # Cleanupper process loaded Raster image
+    test("Cleanupper process Raster image", [
+        'var pal = new Palette(); var ink = pal.addColor(0,0,0,255);'
+        'var vi = new VectorImage(); vi.addCircle(0,0,30,3,ink); vi.setPalette(pal);'
+        'var rast = new Rasterizer(); rast.xres = 128; rast.yres = 128;'
+        'var rasterImg = rast.rasterize(vi.toImage());'
+        'rasterImg.save("/tmp/cleanup_test_src.png");',
+        'var img = new Image(); img.load("/tmp/cleanup_test_src.png");',
+        'var cl = new Cleanupper(); cl.lineProcessing = "greyscale"; cl.despeckling = 3;'
+        'var cleaned = cl.process(img); print(cleaned.type)',
+    ], lambda r: (output_of(r, 2) == "ToonzRaster", f"type={output_of(r, 2)}"), group=G)
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("  COMPREHENSIVE ATOMIC TEST SUITE")
@@ -1873,6 +2184,11 @@ if __name__ == "__main__":
     test_full_pipeline()
     test_new_features()
     test_missing_features()
+    test_vectorization()
+    test_compositing()
+    test_rendering_output()
+    test_cleanupper()
+    test_tracker()
 
     # Summary
     print("\n" + "=" * 60)

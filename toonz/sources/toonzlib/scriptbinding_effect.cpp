@@ -317,6 +317,62 @@ int Effect::getParamCount() const {
   return m_fx->getParams()->getParamCount();
 }
 
+int Effect::getInputPortCount() const {
+  if (!m_fx) return 0;
+  return m_fx->getInputPortCount();
+}
+
+QScriptValue Effect::getInputPortName(int idx) {
+  if (!m_fx) return context()->throwError(tr("Effect is null"));
+  if (idx < 0 || idx >= m_fx->getInputPortCount())
+    return context()->throwError(
+        tr("Port index %1 out of range [0, %2)")
+            .arg(idx)
+            .arg(m_fx->getInputPortCount()));
+  return QString::fromStdString(m_fx->getInputPortName(idx));
+}
+
+QScriptValue Effect::connectInput(const QScriptValue &portArg,
+                                  const QScriptValue &sourceArg) {
+  if (!m_fx) return context()->throwError(tr("Effect is null"));
+
+  // Source can be an Effect or null (to disconnect)
+  TFx *sourceFx = nullptr;
+  if (!sourceArg.isNull() && !sourceArg.isUndefined()) {
+    Effect *srcEff = qscriptvalue_cast<Effect *>(sourceArg);
+    if (!srcEff)
+      return context()->throwError(
+          tr("Second argument must be an Effect or null"));
+    if (!srcEff->getFx())
+      return context()->throwError(tr("Source effect is null"));
+    sourceFx = srcEff->getFx().getPointer();
+  }
+
+  // Port can be index (int) or name (string)
+  TFxPort *port = nullptr;
+  if (portArg.isNumber()) {
+    int idx = portArg.toInt32();
+    if (idx < 0 || idx >= m_fx->getInputPortCount())
+      return context()->throwError(
+          tr("Port index %1 out of range [0, %2)")
+              .arg(idx)
+              .arg(m_fx->getInputPortCount()));
+    port = m_fx->getInputPort(idx);
+  } else if (portArg.isString()) {
+    std::string name = portArg.toString().toStdString();
+    port             = m_fx->getInputPort(name);
+    if (!port)
+      return context()->throwError(
+          tr("No input port named '%1'").arg(portArg.toString()));
+  } else {
+    return context()->throwError(
+        tr("First argument must be a port index or name"));
+  }
+
+  port->setFx(sourceFx);
+  return context()->thisObject();
+}
+
 QScriptValue checkEffect(QScriptContext *context, const QScriptValue &value,
                          Effect *&out) {
   out = qscriptvalue_cast<Effect *>(value);

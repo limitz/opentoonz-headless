@@ -37,6 +37,13 @@ public:
   Q_PROPERTY(int paramCount READ getParamCount)
   int getParamCount() const;
 
+  Q_PROPERTY(int inputPortCount READ getInputPortCount)
+  int getInputPortCount() const;
+
+  Q_INVOKABLE QScriptValue getInputPortName(int idx);
+  Q_INVOKABLE QScriptValue connectInput(const QScriptValue &portArg,
+                                        const QScriptValue &sourceArg);
+
   TFxP getFx() const { return m_fx; }
 };
 

@@ -23,6 +23,8 @@ set(MOC_HEADERS
     ../include/toonz/scriptbinding_inbetween.h
     ../include/toonz/scriptbinding_plasticrig.h
     ../include/toonz/scriptbinding_effect.h
+    ../include/toonz/scriptbinding_cleanupper.h
+    ../include/toonz/scriptbinding_tracker.h
     ../include/toonz/scriptengine.h
     ../include/toonz/stylemanager.h
     ../include/toonz/tcenterlinevectorizer.h
@@ -240,6 +242,11 @@ set(SOURCES
     scriptbinding_inbetween.cpp
     scriptbinding_plasticrig.cpp
     scriptbinding_effect.cpp
+    scriptbinding_cleanupper.cpp
+    scriptbinding_tracker.cpp
+    tracker_objecttracker.cpp
+    tracker_predict3d.cpp
+    tracker_metnum.cpp
     scriptengine.cpp
     skeleton.cpp
     skeletonlut.cpp

@@ -21,6 +21,8 @@
 #include "toonz/scriptbinding_inbetween.h"
 #include "toonz/scriptbinding_plasticrig.h"
 #include "toonz/scriptbinding_effect.h"
+#include "toonz/scriptbinding_cleanupper.h"
+#include "toonz/scriptbinding_tracker.h"
 #include "toonz/tcenterlinevectorizer.h"
 #include "toonz/tcamera.h"
 #include "toonz/stage.h"
@@ -190,6 +192,8 @@ void bindAll(QScriptEngine &engine) {
   bindClass<Inbetween>(engine, "Inbetween");
   bindClass<PlasticRig>(engine, "PlasticRig");
   bindClass<Effect>(engine, "Effect");
+  bindClass<Cleanupper>(engine, "Cleanupper");
+  bindClass<Tracker>(engine, "Tracker");
 
   // Setup any static methods
   setupStaticMethods(engine);

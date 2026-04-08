@@ -12,6 +12,8 @@
 #include "toonz/sceneproperties.h"
 #include "toonz/tcamera.h"
 #include "toutputproperties.h"
+#include "toonz/movierenderer.h"
+#include "tlevel_io.h"
 #include <QMutex>
 #include <QMutexLocker>
 #include <QWaitCondition>
@@ -63,7 +65,13 @@ public:
   QList<int> m_columnList;
   QList<int> m_frameList;
 
-  Imp() : m_completed(false) {
+  // Quality/format settings
+  TRenderSettings::ResampleQuality m_quality;
+  int m_bpp;         // 32=8bit, 64=16bit
+  int m_threadCount;
+
+  Imp() : m_completed(false), m_quality(TRenderSettings::StandardResampleQuality),
+          m_bpp(32), m_threadCount(1) {
     m_renderer.setThreadsCount(1);
     m_renderer.addPort(this);
   }
@@ -105,6 +113,8 @@ public:
       ToonzScene *scene, const std::vector<int> &rows) {
     TRenderSettings settings =
         scene->getProperties()->getOutputProperties()->getRenderSettings();
+    settings.m_quality = m_quality;
+    settings.m_bpp     = m_bpp;
 
     QList<bool> oldColumnStates;
     enableColumns(scene, oldColumnStates);
@@ -237,6 +247,113 @@ Q_INVOKABLE QScriptValue Renderer::renderFrame(const QScriptValue &sceneArg,
   Image *outputImage = new Image();
   if (img) outputImage->setImg(img);
   return create(engine(), outputImage);
+}
+
+// -----------------------------------------------------------
+// Quality property
+// -----------------------------------------------------------
+
+static const struct {
+  const char *name;
+  TRenderSettings::ResampleQuality value;
+} qualityMap[] = {
+    {"standard", TRenderSettings::StandardResampleQuality},
+    {"improved", TRenderSettings::ImprovedResampleQuality},
+    {"high", TRenderSettings::HighResampleQuality},
+    {"triangle", TRenderSettings::Triangle_FilterResampleQuality},
+    {"mitchell", TRenderSettings::Mitchell_FilterResampleQuality},
+    {"cubic5", TRenderSettings::Cubic5_FilterResampleQuality},
+    {"cubic75", TRenderSettings::Cubic75_FilterResampleQuality},
+    {"cubic1", TRenderSettings::Cubic1_FilterResampleQuality},
+    {"lanczos2", TRenderSettings::Lanczos2_FilterResampleQuality},
+    {"lanczos3", TRenderSettings::Lanczos3_FilterResampleQuality},
+    {"hann2", TRenderSettings::Hann2_FilterResampleQuality},
+    {"hann3", TRenderSettings::Hann3_FilterResampleQuality},
+    {"hamming2", TRenderSettings::Hamming2_FilterResampleQuality},
+    {"hamming3", TRenderSettings::Hamming3_FilterResampleQuality},
+    {"gauss", TRenderSettings::Gauss_FilterResampleQuality},
+    {"closestPixel", TRenderSettings::ClosestPixel_FilterResampleQuality},
+    {"bilinear", TRenderSettings::Bilinear_FilterResampleQuality},
+};
+
+QString Renderer::getQuality() const {
+  for (const auto &q : qualityMap) {
+    if (q.value == m_imp->m_quality) return QString(q.name);
+  }
+  return "standard";
+}
+
+void Renderer::setQuality(const QString &q) {
+  std::string qs = q.toLower().toStdString();
+  for (const auto &qm : qualityMap) {
+    if (qs == qm.name) {
+      m_imp->m_quality = qm.value;
+      return;
+    }
+  }
+}
+
+int Renderer::getChannelWidth() const {
+  return m_imp->m_bpp == 64 ? 16 : 8;
+}
+
+void Renderer::setChannelWidth(int bpc) {
+  m_imp->m_bpp = (bpc >= 16) ? 64 : 32;
+}
+
+int Renderer::getThreadCount() const { return m_imp->m_threadCount; }
+
+void Renderer::setThreadCount(int n) {
+  m_imp->m_threadCount = (n < 1) ? 1 : n;
+  m_imp->m_renderer.setThreadsCount(m_imp->m_threadCount);
+}
+
+// -----------------------------------------------------------
+// renderToFile -- render a frame range directly to disk
+// -----------------------------------------------------------
+
+QScriptValue Renderer::renderToFile(const QScriptValue &sceneArg,
+                                    const QString &path, int from, int to,
+                                    int step) {
+  Scene *scene     = nullptr;
+  QScriptValue err = getScene(context(), sceneArg, scene);
+  if (err.isError()) return err;
+
+  if (from < 0 || to < from || step < 1)
+    return context()->throwError(
+        QObject::tr("Invalid frame range: from=%1 to=%2 step=%3")
+            .arg(from)
+            .arg(to)
+            .arg(step));
+
+  TFilePath fp(path.toStdWString());
+  ToonzScene *ts = scene->getToonzScene();
+
+  // Build render settings
+  TRenderSettings settings =
+      ts->getProperties()->getOutputProperties()->getRenderSettings();
+  settings.m_quality = m_imp->m_quality;
+  settings.m_bpp     = m_imp->m_bpp;
+
+  // Create MovieRenderer
+  MovieRenderer movieRenderer(ts, fp, m_imp->m_threadCount, false);
+  movieRenderer.setRenderSettings(settings);
+
+  TPointD dpi = ts->getCurrentCamera()->getDpi();
+  movieRenderer.setDpi(dpi.x, dpi.y);
+
+  // Add frames
+  for (int f = from; f <= to; f += step) {
+    TFxPair fxPair;
+    fxPair.m_frameA = buildSceneFx(ts, (double)f, 1, false);
+    fxPair.m_frameB = TRasterFxP();
+    movieRenderer.addFrame((double)f, fxPair);
+  }
+
+  // Start and wait
+  movieRenderer.start();
+
+  return context()->thisObject();
 }
 
 void Renderer::dumpCache() {}

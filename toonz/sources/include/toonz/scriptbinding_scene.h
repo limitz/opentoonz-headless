@@ -55,6 +55,12 @@ public:
   // FX graph
   Q_INVOKABLE QScriptValue connectEffect(int colIdx,
                                          const QScriptValue &effectArg);
+  Q_INVOKABLE QScriptValue chainEffects(const QScriptValue &upstreamArg,
+                                        const QScriptValue &downstreamArg);
+  Q_INVOKABLE QScriptValue connectBlend(int colA, int colB,
+                                        const QScriptValue &blendArg);
+  Q_INVOKABLE QScriptValue disconnectEffect(const QScriptValue &effectArg);
+  Q_INVOKABLE QScriptValue getColumnEffect(int colIdx);
 
   // Frame rate
   Q_INVOKABLE QScriptValue setFrameRate(double fps);
